@@ -1,0 +1,22 @@
+minimumReleaseAge: 1440
+
+minimumReleaseAgeExclude:
+  - '@replit/*'
+
+packages:
+  - artifacts/mobile
+
+catalog:
+  '@tanstack/react-query': ^5.90.21
+  '@types/node': ^25.3.3
+  react: 19.1.0
+  react-dom: 19.1.0
+  typescript: ~5.9.3
+
+autoInstallPeers: false
+
+onlyBuiltDependencies:
+  - esbuild
+
+allowBuilds:
+  esbuild: true

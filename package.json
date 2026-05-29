@@ -1,0 +1,15 @@
+{
+  "name": "workspace",
+  "version": "0.0.0",
+  "license": "MIT",
+  "scripts": {
+    "preinstall": "rm -f package-lock.json yarn.lock",
+    "build": "pnpm --filter @workspace/mobile run build",
+    "typecheck": "pnpm --filter @workspace/mobile run typecheck"
+  },
+  "private": true,
+  "devDependencies": {
+    "prettier": "^3.8.3",
+    "typescript": "~5.9.3"
+  }
+}
