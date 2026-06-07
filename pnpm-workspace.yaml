@@ -4,6 +4,7 @@ minimumReleaseAgeExclude:
   - '@replit/*'
 
 packages:
+  - artifacts/backend
   - artifacts/mobile
 
 catalog:

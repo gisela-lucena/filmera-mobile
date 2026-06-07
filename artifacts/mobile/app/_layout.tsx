@@ -28,6 +28,7 @@ function RootLayoutNav() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="reset-password" />
       <Stack.Screen name="room" />
       <Stack.Screen
         name="match"

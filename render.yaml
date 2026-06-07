@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: film-era-backend
+    runtime: node
+    buildCommand: corepack enable && pnpm install --frozen-lockfile
+    startCommand: pnpm --filter @workspace/backend start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 24
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MONGODB_URI
+        sync: false
+      - key: ALLOWED_ORIGINS
+        value: "*"
+      - key: PASSWORD_RESET_URL
+        value: "filmera://reset-password"
+      - key: RESEND_API_KEY
+        sync: false
+      - key: SMTP_FROM
+        sync: false

@@ -7,7 +7,8 @@ declare const process: { env: { [key: string]: string | undefined } };
 // Web can use the local API proxy. Native apps cannot use a relative /api URL,
 // so the iOS/Android preview talks directly to the deployed backend.
 const DOMAIN = process.env["EXPO_PUBLIC_DOMAIN"] ?? "";
-const API_ORIGIN = process.env["EXPO_PUBLIC_API_URL"] ?? "https://filmera-backend.onrender.com";
+const API_ORIGIN =
+  process.env["EXPO_PUBLIC_API_URL"] ?? "https://filmera-backend.onrender.com";
 const BASE_URL = DOMAIN
   ? `https://${DOMAIN}/api/filmera`
   : Platform.OS === "web"
@@ -16,7 +17,7 @@ const BASE_URL = DOMAIN
 
 const g = globalThis as typeof globalThis & { _filmeraToken?: string | null };
 
-function getToken(): string | null {
+export function getToken(): string | null {
   return g._filmeraToken ?? null;
 }
 
@@ -86,7 +87,7 @@ export interface Room {
   matchedMovie?: Movie | null;
 }
 
-function normalizeMovies(movies: any[]): Movie[] {
+export function normalizeMovies(movies: any[]): Movie[] {
   return (movies ?? []).map((m) => ({
     id: m.tmdbId ?? m.id,
     tmdbId: m.tmdbId ?? m.id,
@@ -98,7 +99,7 @@ function normalizeMovies(movies: any[]): Movie[] {
   }));
 }
 
-function normalizeRoom(data: any): Room {
+export function normalizeRoom(data: any): Room {
   const r = data?.room ?? data;
   return {
     _id: r._id,
@@ -107,6 +108,46 @@ function normalizeRoom(data: any): Room {
     participants: r.participants ?? [],
     matchedMovie: r.matchedMovie ? normalizeMovies([r.matchedMovie])[0] : null,
   };
+}
+
+function getExtraConfigValue(key: string): string {
+  const envValue = process.env[key];
+  const extraValue = Constants.expoConfig?.extra?.[key];
+
+  if (typeof envValue === "string" && envValue.length > 0) return envValue;
+  if (typeof extraValue === "string" && extraValue.length > 0)
+    return extraValue;
+
+  return "";
+}
+
+function toWebSocketOrigin(origin: string): string {
+  return origin
+    .replace(/^http:/, "ws:")
+    .replace(/^https:/, "wss:")
+    .replace(/\/$/, "");
+}
+
+export function getRealtimeUrl(path: string): string {
+  const wsOrigin = getExtraConfigValue("EXPO_PUBLIC_WS_URL");
+  const token = getToken();
+  let origin = wsOrigin ? toWebSocketOrigin(wsOrigin) : "";
+
+  if (!origin) {
+    if (DOMAIN) {
+      origin = `wss://${DOMAIN}/api/filmera`;
+    } else if (Platform.OS === "web") {
+      const location = globalThis.location;
+      const protocol = location?.protocol === "https:" ? "wss:" : "ws:";
+      origin = `${protocol}//${location?.host ?? ""}${BASE_URL}`;
+    } else {
+      origin = toWebSocketOrigin(API_ORIGIN);
+    }
+  }
+
+  const url = new URL(`${origin}${path}`);
+  if (token) url.searchParams.set("token", token);
+  return url.toString();
 }
 
 export const api = {
@@ -133,6 +174,22 @@ export const api = {
     return user;
   },
 
+  forgotPassword(body: { email: string }) {
+    return request<{ message: string }>("/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({
+        email: body.email.trim().toLowerCase(),
+      }),
+    });
+  },
+
+  resetPassword(body: { token: string; password: string }) {
+    return request<{ message: string }>("/reset-password", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
+
   getCurrentUser(): Promise<User> {
     return request<any>("/users/me").then((d) => d?.user ?? d);
   },
@@ -157,36 +214,43 @@ export const api = {
     return normalizeRoom(data);
   },
 
-  async joinRoom(roomId: string): Promise<Room> {
-    const data = await request<any>(`/rooms/${roomId}/join`, { method: "POST" });
+  async joinRoom(roomCode: string): Promise<Room> {
+    const data = await request<any>(`/rooms/${roomCode}/join`, {
+      method: "POST",
+    });
     return normalizeRoom(data);
   },
 
-  async getRoom(roomId: string): Promise<Room> {
-    const data = await request<any>(`/rooms/${roomId}`);
+  async getRoom(roomCode: string): Promise<Room> {
+    const data = await request<any>(`/rooms/${roomCode}`);
     return normalizeRoom(data);
   },
 
-  async createSwipe(body: { roomCode: string; movie: Movie; liked: boolean }): Promise<{ match?: Movie }> {
+  async createSwipe(body: {
+    roomCode: string;
+    movie: Movie;
+    liked: boolean;
+  }): Promise<{ match?: Movie }> {
     const data = await request<any>("/swipes", {
       method: "POST",
       body: JSON.stringify({
-        roomId: body.roomCode,
+        roomCode: body.roomCode,
         movieId: body.movie.tmdbId ?? body.movie.id,
         liked: body.liked,
       }),
     });
-    if (data?.match) {
-      return { match: normalizeMovies([data.match])[0] };
+    const match = data?.match ?? data?.matchedMovie;
+    if (match) {
+      return { match: normalizeMovies([match])[0] };
     }
     return {};
   },
 };
 
 export interface FilterOptions {
-  genres?: number[];      // TMDB genre IDs
-  year?: string;          // Exact release year e.g. "2024"
-  sort?: string;          // TMDB sort_by value e.g. "popularity.desc"
+  genres?: number[]; // TMDB genre IDs
+  year?: string; // Exact release year e.g. "2024"
+  sort?: string; // TMDB sort_by value e.g. "popularity.desc"
 }
 
 const WATCH_REGION = "US";
@@ -198,7 +262,8 @@ function getTmdbToken(): string {
   const extraToken = Constants.expoConfig?.extra?.["EXPO_PUBLIC_TMDB_TOKEN"];
 
   if (typeof envToken === "string" && envToken.length > 0) return envToken;
-  if (typeof extraToken === "string" && extraToken.length > 0) return extraToken;
+  if (typeof extraToken === "string" && extraToken.length > 0)
+    return extraToken;
 
   return "";
 }
@@ -225,11 +290,16 @@ function normalizeTmdbMovie(movie: any): Movie {
   };
 }
 
-async function hasWatchAvailability(movieId: number, token: string): Promise<boolean> {
+async function hasWatchAvailability(
+  movieId: number,
+  token: string,
+): Promise<boolean> {
   const data = await tmdbFetch<any>(`/movie/${movieId}/watch/providers`, token);
   const region = data?.results?.[WATCH_REGION];
   if (!region) return false;
-  return WATCH_PROVIDER_KEYS.some((key) => Array.isArray(region[key]) && region[key].length > 0);
+  return WATCH_PROVIDER_KEYS.some(
+    (key) => Array.isArray(region[key]) && region[key].length > 0,
+  );
 }
 
 function sortMovies(movies: Movie[], sort = "popularity.desc"): Movie[] {
@@ -246,20 +316,31 @@ function sortMovies(movies: Movie[], sort = "popularity.desc"): Movie[] {
   return sorted;
 }
 
-async function filterByWatchAvailability(movies: Movie[], tmdbToken = getTmdbToken()): Promise<Movie[]> {
+async function filterByWatchAvailability(
+  movies: Movie[],
+  tmdbToken = getTmdbToken(),
+): Promise<Movie[]> {
   if (!tmdbToken) return movies;
 
   const availability = await Promise.all(
     movies.map(async (movie) => ({
       movie,
-      available: await hasWatchAvailability(movie.tmdbId ?? movie.id, tmdbToken),
+      available: await hasWatchAvailability(
+        movie.tmdbId ?? movie.id,
+        tmdbToken,
+      ),
     })),
   );
 
-  return availability.filter(({ available }) => available).map(({ movie }) => movie);
+  return availability
+    .filter(({ available }) => available)
+    .map(({ movie }) => movie);
 }
 
-async function fetchTmdbMoviesWithFilters(filters: FilterOptions, tmdbToken: string): Promise<Movie[]> {
+async function fetchTmdbMoviesWithFilters(
+  filters: FilterOptions,
+  tmdbToken: string,
+): Promise<Movie[]> {
   const pages = await Promise.all(
     Array.from({ length: TMDB_MOVIE_PAGE_COUNT }, async (_, index) => {
       const params = new URLSearchParams({
@@ -287,11 +368,15 @@ async function fetchTmdbMoviesWithFilters(filters: FilterOptions, tmdbToken: str
   );
 
   return Array.from(
-    new Map(pages.flat().map((movie) => [movie.tmdbId ?? movie.id, movie])).values(),
+    new Map(
+      pages.flat().map((movie) => [movie.tmdbId ?? movie.id, movie]),
+    ).values(),
   );
 }
 
-async function fetchBackendMoviesWithFilters(filters: FilterOptions): Promise<Movie[]> {
+async function fetchBackendMoviesWithFilters(
+  filters: FilterOptions,
+): Promise<Movie[]> {
   const params = new URLSearchParams();
 
   if (filters.genres?.length) {
@@ -307,12 +392,17 @@ async function fetchBackendMoviesWithFilters(filters: FilterOptions): Promise<Mo
   return normalizeMovies(data?.movies ?? data ?? []);
 }
 
-export async function fetchMoviesWithFilters(filters: FilterOptions = {}): Promise<Movie[]> {
+export async function fetchMoviesWithFilters(
+  filters: FilterOptions = {},
+): Promise<Movie[]> {
   const tmdbToken = getTmdbToken();
 
   if (tmdbToken) {
     const tmdbMovies = await fetchTmdbMoviesWithFilters(filters, tmdbToken);
-    const availableMovies = await filterByWatchAvailability(tmdbMovies, tmdbToken);
+    const availableMovies = await filterByWatchAvailability(
+      tmdbMovies,
+      tmdbToken,
+    );
 
     if (availableMovies.length > 0) {
       return sortMovies(availableMovies, filters.sort).slice(0, 100);

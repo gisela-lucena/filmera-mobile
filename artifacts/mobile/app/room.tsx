@@ -19,6 +19,7 @@ import { Movie, MovieCard, MovieCardRef } from "@/components/MovieCard";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
 import { api, fetchMoviesWithFilters, FilterOptions, Room } from "@/services/api";
+import { connectRoomRealtime } from "@/services/roomRealtime";
 
 // ─── Genre list (TMDB IDs) ─────────────────────────────────────────────────
 const GENRES = [
@@ -82,31 +83,71 @@ export default function RoomScreen() {
 
   const cardRef = useRef<MovieCardRef>(null);
   const swiping = useRef(false);
+  const navigatingToMatch = useRef(false);
+  const stageRef = useRef<Stage>("loading");
+
+  useEffect(() => {
+    stageRef.current = stage;
+  }, [stage]);
+
+  const showMatch = useCallback(
+    (movie: Movie) => {
+      if (navigatingToMatch.current) return;
+
+      navigatingToMatch.current = true;
+      setMatchedMovie(movie);
+      setStage("matched");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      setTimeout(() => {
+        router.push({
+          pathname: "/match",
+          params: {
+            movieTitle: movie.title,
+            moviePoster: movie.poster,
+            movieYear: movie.year,
+            movieGenre: movie.genre ?? "",
+            movieRating: movie.rating,
+            partnerName: "your partner",
+            myName: user?.name ?? "You",
+          },
+        });
+      }, 400);
+    },
+    [router, user]
+  );
 
   // ── Initialize on mount ─────────────────────────────────────────────────
   useEffect(() => { initRoom(); }, []);
 
-  // ── Poll participants & match ────────────────────────────────────────────
+  // ── Realtime participants & match updates ────────────────────────────────
   useEffect(() => {
-    if (!room || stage === "matched" || stage === "loading" || stage === "finished") return;
-    const id = setInterval(async () => {
-      try {
-        const updated = await api.getRoom(room._id);
+    if (!room) return;
+
+    const connection = connectRoomRealtime({
+      roomCode: room.code,
+      onRoom: (updated) => {
+        setRoom(updated);
         setParticipantCount(updated.participants.length || 1);
-        if (stage === "waiting" && updated.movies.length > 0) {
-          // Host has created the room with movies — start swiping
+
+        if (stageRef.current === "waiting" && updated.movies.length > 0) {
           setMovies(updated.movies);
           setCurrentIndex(0);
           setStage("swiping");
         }
+
         if (updated.matchedMovie) {
-          setMatchedMovie(updated.matchedMovie);
-          setStage("matched");
+          showMatch(updated.matchedMovie);
         }
-      } catch {}
-    }, 3000);
-    return () => clearInterval(id);
-  }, [room, stage]);
+      },
+      onMatch: showMatch,
+      onError: (message) => {
+        if (stageRef.current !== "matched") setError(message);
+      },
+    });
+
+    return () => connection.close();
+  }, [room?.code, showMatch]);
 
   const initRoom = async () => {
     setError("");
@@ -172,40 +213,29 @@ export default function RoomScreen() {
       if (!movie) return;
 
       swiping.current = true;
+      setError("");
       Haptics.impactAsync(
         direction === "like" ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light
       );
 
       try {
-        const result = await api.createSwipe({ roomCode: room._id, movie, liked: direction === "like" });
+        const result = await api.createSwipe({ roomCode: room.code, movie, liked: direction === "like" });
         if (result.match) {
-          setMatchedMovie(result.match);
-          setStage("matched");
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          setTimeout(() => {
-            router.push({
-              pathname: "/match",
-              params: {
-                movieTitle: result.match!.title,
-                moviePoster: result.match!.poster,
-                movieYear: result.match!.year,
-                movieGenre: "",
-                movieRating: result.match!.rating,
-                partnerName: "your partner",
-                myName: user?.name ?? "You",
-              },
-            });
-          }, 400);
+          showMatch(result.match);
           return;
         }
-      } catch {}
+      } catch (e: any) {
+        setError(e.message || "Failed to save swipe. Try again.");
+        swiping.current = false;
+        return;
+      }
 
       const next = currentIndex + 1;
       if (next >= movies.length) setStage("finished");
       else setCurrentIndex(next);
       swiping.current = false;
     },
-    [currentIndex, movies, stage, room, user, router]
+    [currentIndex, movies, stage, room, showMatch]
   );
 
   const handleSwipeRight = useCallback(() => handleSwipe("like"), [handleSwipe]);
@@ -437,6 +467,11 @@ export default function RoomScreen() {
       {/* SWIPING */}
       {stage === "swiping" && (
         <View style={styles.cardsArea}>
+          {error ? (
+            <Text style={[styles.swipeError, { color: colors.dislike }]}>
+              {error}
+            </Text>
+          ) : null}
           <View style={styles.cards}>
             {nextMovie && (
               <MovieCard
@@ -663,6 +698,12 @@ const styles = StyleSheet.create({
 
   // Swiping
   cardsArea: { flex: 1, paddingHorizontal: 16, paddingVertical: 12 },
+  swipeError: {
+    marginBottom: 10,
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    textAlign: "center",
+  },
   cards: { flex: 1, position: "relative" },
 
   // Buttons

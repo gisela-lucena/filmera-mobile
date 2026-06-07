@@ -5,6 +5,8 @@
   "scripts": {
     "preinstall": "rm -f package-lock.json yarn.lock",
     "build": "pnpm --filter @workspace/mobile run build",
+    "dev:backend": "pnpm --filter @workspace/backend run dev",
+    "start:backend": "pnpm --filter @workspace/backend run start",
     "typecheck": "pnpm --filter @workspace/mobile run typecheck"
   },
   "private": true,
