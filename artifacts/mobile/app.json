@@ -14,10 +14,12 @@
       "backgroundColor": "#09090F"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.filmera.mobile"
     },
     "android": {
-      "backgroundColor": "#09090F"
+      "backgroundColor": "#09090F",
+      "package": "com.filmera.mobile"
     },
     "web": {
       "favicon": "./assets/images/icon.png"
