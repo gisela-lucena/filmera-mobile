@@ -1034,7 +1034,6 @@ const styles = StyleSheet.create({
     minHeight: 28,
     alignSelf: "flex-end",
     justifyContent: "center",
-    cursor: "pointer",
   },
   forgotPasswordText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   matchText: { fontSize: 12, fontFamily: "Inter_400Regular" },
