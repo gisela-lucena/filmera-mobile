@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
+import { useInfoToolTip } from "@/components/InfoToolTip";
 import { api } from "@/services/api";
 
 export default function HomeScreen() {
@@ -28,6 +29,7 @@ export default function HomeScreen() {
   const params = useLocalSearchParams<{ passwordReset?: string }>();
   const insets = useSafeAreaInsets();
   const { user, login, signup, logout } = useAuth();
+  const { showInfoTooltip } = useInfoToolTip();
 
   const [authModal, setAuthModal] = useState<"none" | "login" | "register">(
     "none",
@@ -35,10 +37,6 @@ export default function HomeScreen() {
   const [authLoading, setAuthLoading] = useState(false);
   const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
   const [authError, setAuthError] = useState("");
-  const [infoTooltip, setInfoTooltip] = useState<{
-    type: "success" | "error";
-    message: string;
-  } | null>(null);
 
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -50,7 +48,6 @@ export default function HomeScreen() {
   const [regPasswordConfirm, setRegPasswordConfirm] = useState("");
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [showRegPasswordConfirm, setShowRegPasswordConfirm] = useState(false);
-  const [regSuccess, setRegSuccess] = useState("");
 
   const [mode, setMode] = useState<"none" | "create" | "join">("none");
   const [joinCode, setJoinCode] = useState("");
@@ -63,31 +60,16 @@ export default function HomeScreen() {
   const isValidEmail = (email: string) => /^\S+@\S+\.\S+$/.test(email);
 
   useEffect(() => {
-    if (!infoTooltip) return;
-    const timeout = setTimeout(() => setInfoTooltip(null), 3200);
-    return () => clearTimeout(timeout);
-  }, [infoTooltip]);
-
-  useEffect(() => {
-    if (params.passwordReset !== "success") return;
+    if (params.passwordReset !== "openLogin") return;
 
     setAuthError("");
     setLoginPassword("");
     setAuthModal("login");
-    setInfoTooltip({
-      type: "success",
-      message: "Password reset successfully. Please log in.",
-    });
     router.setParams({ passwordReset: undefined });
   }, [params.passwordReset, router]);
 
-  const showInfoTooltip = (type: "success" | "error", message: string) => {
-    setInfoTooltip({ type, message });
-  };
-
   const openLogin = () => {
     setAuthError("");
-    setInfoTooltip(null);
     setLoginEmail("");
     setLoginPassword("");
     setShowLoginPassword(false);
@@ -96,14 +78,12 @@ export default function HomeScreen() {
 
   const openRegister = () => {
     setAuthError("");
-    setInfoTooltip(null);
     setRegName("");
     setRegEmail("");
     setRegPassword("");
     setRegPasswordConfirm("");
     setShowRegPassword(false);
     setShowRegPasswordConfirm(false);
-    setRegSuccess("");
     setAuthModal("register");
   };
 
@@ -161,25 +141,21 @@ export default function HomeScreen() {
     const email = normalizeEmail(regEmail);
     if (!regName.trim()) {
       const message = "Enter your name.";
-      setAuthError(message);
       showInfoTooltip("error", message);
       return;
     }
     if (!isValidEmail(email)) {
       const message = "Enter a valid email address.";
-      setAuthError(message);
       showInfoTooltip("error", message);
       return;
     }
     if (regPassword.length < 8) {
       const message = "Password must be at least 8 characters.";
-      setAuthError(message);
       showInfoTooltip("error", message);
       return;
     }
     if (regPassword !== regPasswordConfirm) {
       const message = "Passwords do not match.";
-      setAuthError(message);
       showInfoTooltip("error", message);
       return;
     }
@@ -187,7 +163,6 @@ export default function HomeScreen() {
       setAuthLoading(true);
       setAuthError("");
       await signup(regName.trim(), email, regPassword);
-      setRegSuccess("Account created! Please log in.");
       showInfoTooltip(
         "success",
         "Account created successfully. Please log in.",
@@ -198,7 +173,6 @@ export default function HomeScreen() {
       setLoginPassword("");
     } catch (e: any) {
       const message = e.message || "Registration failed";
-      setAuthError(message);
       showInfoTooltip("error", message);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
@@ -234,35 +208,6 @@ export default function HomeScreen() {
         colors={["#17092A", "#0E051A"]}
         style={StyleSheet.absoluteFill}
       />
-      {infoTooltip ? (
-        <Pressable
-          onPress={() => setInfoTooltip(null)}
-          accessibilityRole="alert"
-          style={[
-            styles.infoTooltip,
-            {
-              top: topPad + 12,
-              borderColor:
-                infoTooltip.type === "success"
-                  ? "rgba(74,222,128,0.55)"
-                  : "rgba(255,107,107,0.6)",
-            },
-          ]}
-        >
-          <Text
-            style={[
-              styles.infoTooltipTitle,
-              {
-                color:
-                  infoTooltip.type === "success" ? "#4ADE80" : colors.dislike,
-              },
-            ]}
-          >
-            {infoTooltip.type === "success" ? "Success" : "Error"}
-          </Text>
-          <Text style={styles.infoTooltipMessage}>{infoTooltip.message}</Text>
-        </Pressable>
-      ) : null}
       <View style={styles.glowTop} />
       <View style={styles.glowBottomRight} />
 
@@ -504,11 +449,6 @@ export default function HomeScreen() {
                     >
                       Log in to continue swiping.
                     </Text>
-                    {regSuccess ? (
-                      <Text style={[styles.successText, { color: "#4ADE80" }]}>
-                        {regSuccess}
-                      </Text>
-                    ) : null}
                     {authError ? (
                       <Text
                         style={[styles.errorText, { color: colors.dislike }]}
@@ -950,35 +890,6 @@ const styles = StyleSheet.create({
   howRow: { flexDirection: "row", alignItems: "center", gap: 14 },
   howEmoji: { fontSize: 20, width: 30, textAlign: "center" },
   howText: { fontSize: 14, fontFamily: "Inter_400Regular" },
-  infoTooltip: {
-    position: "absolute",
-    left: 20,
-    right: 20,
-    zIndex: 20,
-    borderWidth: 1,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: "rgba(14,5,26,0.96)",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.35,
-    shadowRadius: 20,
-    elevation: 8,
-  },
-  infoTooltipTitle: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-    textTransform: "uppercase",
-    letterSpacing: 1.2,
-    marginBottom: 3,
-  },
-  infoTooltipMessage: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontFamily: "Inter_500Medium",
-    color: "#FDFBEF",
-  },
   modalKeyboardView: { flex: 1 },
   modalOverlay: {
     flex: 1,
@@ -1043,7 +954,6 @@ const styles = StyleSheet.create({
     color: "#4ADE80",
   },
   errorText: { fontSize: 13, fontFamily: "Inter_400Regular" },
-  successText: { fontSize: 13, fontFamily: "Inter_400Regular" },
   switchRow: { alignItems: "center", paddingVertical: 4 },
   switchText: { fontSize: 13, fontFamily: "Inter_400Regular" },
 });

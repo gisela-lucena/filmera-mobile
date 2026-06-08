@@ -17,12 +17,14 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
+import { useInfoToolTip } from "@/components/InfoToolTip";
 import { api } from "@/services/api";
 
 export default function ResetPasswordScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { showInfoTooltip } = useInfoToolTip();
   const params = useLocalSearchParams<{ token?: string | string[] }>();
   const token = useMemo(
     () => (Array.isArray(params.token) ? params.token[0] : params.token) || "",
@@ -34,7 +36,6 @@ export default function ResetPasswordScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState("");
 
   const hasConfirmation = confirmPassword.length > 0;
   const passwordsMatch = password === confirmPassword;
@@ -46,26 +47,29 @@ export default function ResetPasswordScreen() {
 
   const handleSubmit = async () => {
     if (!/^[a-f0-9]{64}$/i.test(token)) {
-      setError("Reset link is invalid.");
+      showInfoTooltip("error", "Reset link is invalid.");
       return;
     }
     if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
+      showInfoTooltip("error", "Password must be at least 8 characters.");
       return;
     }
     if (!passwordsMatch) {
-      setError("Passwords do not match.");
+      showInfoTooltip("error", "Passwords do not match.");
       return;
     }
 
     try {
       setIsSubmitting(true);
-      setError("");
       await api.resetPassword({ token, password });
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.replace({ pathname: "/", params: { passwordReset: "success" } });
+      showInfoTooltip("success", "Password reset successfully. Please log in.");
+      router.replace({ pathname: "/", params: { passwordReset: "openLogin" } });
     } catch (requestError: any) {
-      setError(requestError.message || "Could not reset password.");
+      showInfoTooltip(
+        "error",
+        requestError.message || "Could not reset password.",
+      );
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setIsSubmitting(false);
@@ -102,12 +106,6 @@ export default function ResetPasswordScreen() {
             <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
               Create a new password for your account.
             </Text>
-            {error ? (
-              <Text style={[styles.error, { color: colors.dislike }]}>
-                {error}
-              </Text>
-            ) : null}
-
             <PasswordField
               label="NEW PASSWORD"
               placeholder="Min 8 characters"
@@ -264,7 +262,6 @@ const styles = StyleSheet.create({
     color: "#FDFBEF",
   },
   subtitle: { fontSize: 14, lineHeight: 21, fontFamily: "Inter_400Regular" },
-  error: { fontSize: 13, fontFamily: "Inter_400Regular" },
   field: { gap: 7 },
   label: {
     fontSize: 11,
