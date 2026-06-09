@@ -23,6 +23,9 @@ module.exports = {
     extra: {
       ...appJson.expo.extra,
       ...(tmdbToken ? { EXPO_PUBLIC_TMDB_TOKEN: tmdbToken } : {}),
+      eas: {
+        projectId: "c60f0755-8e71-4276-9d2d-5a6223fac47d",
+      },
     },
   },
 };

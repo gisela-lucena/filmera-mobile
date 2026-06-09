@@ -9,17 +9,21 @@
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#09090F"
+      "image": "./assets/images/splash.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#0E051A"
     },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.filmera.mobile"
     },
     "android": {
-      "backgroundColor": "#09090F",
-      "package": "com.filmera.mobile"
+      "backgroundColor": "#0E051A",
+      "package": "com.filmera.mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#7200C9"
+      }
     },
     "web": {
       "favicon": "./assets/images/icon.png"
@@ -31,7 +35,15 @@
           "origin": "https://replit.com/"
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash.png",
+          "resizeMode": "cover",
+          "backgroundColor": "#0E051A"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
