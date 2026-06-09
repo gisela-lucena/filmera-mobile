@@ -15,6 +15,10 @@ const API_PREFIX = "/api/filmera";
 const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000;
 const PASSWORD_RESET_URL =
   process.env.PASSWORD_RESET_URL || "filmera://reset-password";
+const EXPO_GO_RESET_URL = process.env.EXPO_GO_RESET_URL || "";
+const PUBLIC_BACKEND_URL = (
+  process.env.PUBLIC_BACKEND_URL || "https://filmera-mobile.onrender.com"
+).replace(/\/$/, "");
 const RESEND_API_URL =
   process.env.RESEND_API_URL || "https://api.resend.com/emails";
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || "*")
@@ -174,9 +178,30 @@ function signToken(user) {
 }
 
 function createPasswordResetUrl(resetToken) {
+  const url = new URL(`${PUBLIC_BACKEND_URL}/open-reset-password`);
+  url.searchParams.set("token", resetToken);
+  return url.toString();
+}
+
+function createPasswordResetDeepLink(resetToken) {
   const url = new URL(PASSWORD_RESET_URL);
   url.searchParams.set("token", resetToken);
   return url.toString();
+}
+
+function createExpoGoResetLink(resetToken) {
+  if (!EXPO_GO_RESET_URL) return "";
+  const url = new URL(EXPO_GO_RESET_URL);
+  url.searchParams.set("token", resetToken);
+  return url.toString();
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
 }
 
 async function sendPasswordResetEmail({ email, resetToken }) {
@@ -371,6 +396,46 @@ function createRouter() {
 
   router.get("/health", (_req, res) => {
     res.json({ ok: true, database: mongoReady ? "mongodb" : "memory" });
+  });
+
+  router.get("/open-reset-password", (req, res) => {
+    const token = String(req.query?.token || "");
+    if (!/^[a-f0-9]{64}$/i.test(token)) {
+      return res.status(400).send("Invalid password reset link.");
+    }
+
+    const deepLink = createPasswordResetDeepLink(token);
+    const expoGoLink = createExpoGoResetLink(token);
+    const safeDeepLink = escapeHtml(deepLink);
+    const safeExpoGoLink = escapeHtml(expoGoLink);
+    const expoGoButton = expoGoLink
+      ? `<a class="secondary" href="${safeExpoGoLink}">Open in Expo Go</a>`
+      : "";
+    return res.status(200).type("html").send(`<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Open FILMERA</title>
+    <style>
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; box-sizing: border-box; background: #0e051a; color: #fdfbef; font-family: system-ui, sans-serif; text-align: center; }
+      main { width: min(100%, 420px); padding: 32px 24px; border: 1px solid rgba(255,255,255,.14); border-radius: 24px; background: #1e0f35; }
+      h1 { margin: 0 0 10px; font-size: 28px; }
+      p { margin: 0 0 24px; color: #b8a8cc; line-height: 1.5; }
+      a { display: block; padding: 16px; border-radius: 14px; background: #ffd600; color: #17092a; font-weight: 800; text-decoration: none; }
+      a + a { margin-top: 12px; }
+      a.secondary { border: 1px solid rgba(255,255,255,.22); background: transparent; color: #fdfbef; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Open FILMERA</h1>
+      <p>Continue in the app to create your new password.</p>
+      <a href="${safeDeepLink}">Open FILMERA</a>
+      ${expoGoButton}
+    </main>
+  </body>
+</html>`);
   });
 
   router.post("/signup", async (req, res, next) => {
@@ -587,6 +652,20 @@ function createRouter() {
       const room = await findRoomByCode(req.params.roomCode);
       if (!room) return res.status(404).json({ message: "Room not found" });
 
+      return res.json({ room: publicRoom(room) });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  router.patch("/rooms/:roomCode/match/clear", requireUser, async (req, res, next) => {
+    try {
+      const room = await findRoomByCode(req.params.roomCode);
+      if (!room) return res.status(404).json({ message: "Room not found" });
+
+      room.matchedMovie = null;
+      await saveRoom(room);
+      broadcastRoom(room);
       return res.json({ room: publicRoom(room) });
     } catch (error) {
       return next(error);

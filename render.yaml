@@ -16,6 +16,10 @@ services:
         value: "*"
       - key: PASSWORD_RESET_URL
         value: "filmera://reset-password"
+      - key: EXPO_GO_RESET_URL
+        sync: false
+      - key: PUBLIC_BACKEND_URL
+        value: "https://filmera-mobile.onrender.com"
       - key: RESEND_API_KEY
         sync: false
       - key: SMTP_FROM
