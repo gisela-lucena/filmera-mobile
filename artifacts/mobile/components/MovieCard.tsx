@@ -115,9 +115,6 @@ export const MovieCard = forwardRef<MovieCardRef, MovieCardProps>(
       extrapolate: "clamp",
     });
 
-    const scale = 1 - stackIndex * 0.03;
-    const translateYOffset = stackIndex * 12;
-
     const cardAnimatedStyle = isTop
       ? {
           transform: [
@@ -127,7 +124,7 @@ export const MovieCard = forwardRef<MovieCardRef, MovieCardProps>(
           ],
         }
       : {
-          transform: [{ scale }, { translateY: translateYOffset }],
+          transform: [{ scale: 1 }, { translateY: 0 }],
         };
 
     return (
