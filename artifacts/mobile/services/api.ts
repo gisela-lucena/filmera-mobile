@@ -8,7 +8,7 @@ declare const process: { env: { [key: string]: string | undefined } };
 // so the iOS/Android preview talks directly to the deployed backend.
 const DOMAIN = process.env["EXPO_PUBLIC_DOMAIN"] ?? "";
 const API_ORIGIN =
-  process.env["EXPO_PUBLIC_API_URL"] ?? "https://filmera-backend.onrender.com";
+  process.env["EXPO_PUBLIC_API_URL"] ?? "https://filmera-mobile.onrender.com";
 const BASE_URL = DOMAIN
   ? `https://${DOMAIN}/api/filmera`
   : Platform.OS === "web"
