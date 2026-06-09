@@ -530,7 +530,13 @@ function createRouter() {
         user.passwordResetToken = undefined;
         user.passwordResetExpires = undefined;
         if (mongoReady) await user.save({ validateBeforeSave: false });
-        throw error;
+        console.error("Password reset email failed:", error);
+        return res.status(502).json({
+          message:
+            error instanceof Error
+              ? error.message
+              : "Could not send password reset email",
+        });
       }
 
       return res.json(response);
