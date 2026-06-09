@@ -226,6 +226,13 @@ export const api = {
     return normalizeRoom(data);
   },
 
+  async clearMatch(roomCode: string): Promise<Room> {
+    const data = await request<any>(`/rooms/${roomCode}/match/clear`, {
+      method: "PATCH",
+    });
+    return normalizeRoom(data);
+  },
+
   async createSwipe(body: {
     roomCode: string;
     movie: Movie;

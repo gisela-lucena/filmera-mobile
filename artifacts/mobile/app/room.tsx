@@ -86,10 +86,15 @@ export default function RoomScreen() {
   const swiping = useRef(false);
   const navigatingToMatch = useRef(false);
   const stageRef = useRef<Stage>("loading");
+  const moviesRef = useRef<Movie[]>([]);
 
   useEffect(() => {
     stageRef.current = stage;
   }, [stage]);
+
+  useEffect(() => {
+    moviesRef.current = movies;
+  }, [movies]);
 
   const showMatch = useCallback(
     (movie: Movie) => {
@@ -111,11 +116,12 @@ export default function RoomScreen() {
             movieRating: movie.rating,
             partnerName: "your partner",
             myName: user?.name ?? "You",
+            roomCode: room?.code ?? codeParam ?? "",
           },
         });
       }, 400);
     },
-    [router, user]
+    [codeParam, room?.code, router, user]
   );
 
   // ── Initialize on mount ─────────────────────────────────────────────────
@@ -139,6 +145,17 @@ export default function RoomScreen() {
 
         if (updated.matchedMovie) {
           showMatch(updated.matchedMovie);
+        } else if (
+          stageRef.current === "matched" &&
+          navigatingToMatch.current
+        ) {
+          navigatingToMatch.current = false;
+          setMatchedMovie(null);
+          setCurrentIndex((index) => {
+            const next = index + 1;
+            setStage(next >= moviesRef.current.length ? "finished" : "swiping");
+            return next;
+          });
         }
       },
       onMatch: showMatch,
@@ -295,7 +312,7 @@ export default function RoomScreen() {
               </View>
             </>
           ) : (
-            <Text style={styles.headerTitle}>Filmera</Text>
+            <Text style={styles.headerTitle}>FILMERA</Text>
           )}
         </View>
         <View style={styles.backBtn} />

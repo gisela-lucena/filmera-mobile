@@ -231,8 +231,8 @@ export default function HomeScreen() {
               resizeMode="contain"
             />
             <Text style={styles.brandName}>
-              <Text style={styles.brandWhite}>Film</Text>
-              <Text style={styles.brandGold}>era</Text>
+              <Text style={styles.brandWhite}>FILM</Text>
+              <Text style={styles.brandGold}>ERA</Text>
             </Text>
             <Text style={styles.tagline}>
               Decide what to watch,{"\n"}together.
@@ -272,14 +272,7 @@ export default function HomeScreen() {
           {/* Actions */}
           <View style={styles.actions}>
             <Pressable
-              onPress={() => {
-                if (mode === "create") {
-                  handleCreate();
-                } else {
-                  setMode("create");
-                  Haptics.selectionAsync();
-                }
-              }}
+              onPress={handleCreate}
               style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
             >
               <LinearGradient
@@ -288,9 +281,7 @@ export default function HomeScreen() {
                 end={{ x: 1, y: 1 }}
                 style={styles.primaryBtn}
               >
-                <Text style={styles.primaryBtnText}>
-                  {mode === "create" ? "Start Swiping →" : "Create a Room"}
-                </Text>
+                <Text style={styles.primaryBtnText}>Create a Room</Text>
               </LinearGradient>
             </Pressable>
 
@@ -361,24 +352,6 @@ export default function HomeScreen() {
               </View>
             )}
 
-            {mode === "create" && (
-              <Pressable
-                style={({ pressed }) => [
-                  styles.ghostBtn,
-                  { opacity: pressed ? 0.6 : 1 },
-                ]}
-                onPress={() => setMode("none")}
-              >
-                <Text
-                  style={[
-                    styles.ghostBtnText,
-                    { color: colors.mutedForeground },
-                  ]}
-                >
-                  Cancel
-                </Text>
-              </Pressable>
-            )}
           </View>
 
           {/* How it works */}
@@ -596,7 +569,7 @@ export default function HomeScreen() {
                         { color: colors.mutedForeground },
                       ]}
                     >
-                      Join Filmera and start matching.
+                      Join FILMERA and start matching.
                     </Text>
                     {authError ? (
                       <Text

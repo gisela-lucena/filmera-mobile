@@ -1,8 +1,9 @@
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
   Dimensions,
   Image,
@@ -16,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 
 import { useColors } from "@/hooks/useColors";
+import { api } from "@/services/api";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const PARTICLE_COUNT = 22;
@@ -57,7 +59,10 @@ export default function MatchScreen() {
     movieRating: string;
     partnerName: string;
     myName: string;
+    roomCode: string;
   }>();
+  const [clearingMatch, setClearingMatch] = useState(false);
+  const [actionError, setActionError] = useState("");
 
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -189,8 +194,25 @@ export default function MatchScreen() {
         {/* Actions */}
         <Animated.View style={[styles.actions, { opacity: fadeAnim }]}>
           <Pressable
-            style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
-            onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)}
+            disabled={clearingMatch}
+            style={({ pressed }) => [
+              { opacity: pressed || clearingMatch ? 0.75 : 1 },
+            ]}
+            onPress={async () => {
+              if (clearingMatch) return;
+
+              try {
+                setClearingMatch(true);
+                setActionError("");
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                await api.clearMatch(params.roomCode);
+                router.back();
+              } catch (error: any) {
+                setActionError(error.message || "Could not continue swiping.");
+              } finally {
+                setClearingMatch(false);
+              }
+            }}
           >
             <LinearGradient
               colors={["#FFD600", "#FFE566"]}
@@ -198,10 +220,22 @@ export default function MatchScreen() {
               end={{ x: 1, y: 0 }}
               style={styles.watchBtn}
             >
-              <Feather name="play" size={18} color="#17092A" />
-              <Text style={styles.watchBtnText}>Watch Together</Text>
+              {clearingMatch ? (
+                <ActivityIndicator color="#17092A" />
+              ) : (
+                <>
+                  <Feather name="refresh-cw" size={18} color="#17092A" />
+                  <Text style={styles.watchBtnText}>Keep Swiping</Text>
+                </>
+              )}
             </LinearGradient>
           </Pressable>
+
+          {actionError ? (
+            <Text style={[styles.actionError, { color: colors.dislike }]}>
+              {actionError}
+            </Text>
+          ) : null}
 
           <Pressable
             style={({ pressed }) => [
@@ -214,12 +248,13 @@ export default function MatchScreen() {
             ]}
             onPress={() => {
               Haptics.selectionAsync();
-              router.back();
+              router.dismissAll();
+              router.replace("/");
             }}
           >
-            <Feather name="refresh-cw" size={16} color="#FDFBEF" />
+            <Feather name="log-out" size={16} color="#FDFBEF" />
             <Text style={[styles.keepBtnText, { color: colors.foreground }]}>
-              Keep Swiping
+              Leave Room
             </Text>
           </Pressable>
         </Animated.View>
@@ -265,6 +300,11 @@ const styles = StyleSheet.create({
   matchSub: {
     fontSize: 14,
     fontFamily: "Inter_400Regular",
+    textAlign: "center",
+  },
+  actionError: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
     textAlign: "center",
   },
   posterWrap: {
