@@ -21,7 +21,7 @@
       "backgroundColor": "#0E051A",
       "package": "com.filmera.mobile",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
+        "foregroundImage": "./assets/images/adaptive-icon-filmera.png",
         "backgroundColor": "#7200C9"
       }
     },
