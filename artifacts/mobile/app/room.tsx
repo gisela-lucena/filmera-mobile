@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
+  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -208,9 +209,9 @@ export default function RoomScreen() {
   // ── Swipe handler ────────────────────────────────────────────────────────
   const handleSwipe = useCallback(
     async (direction: "like" | "pass") => {
-      if (swiping.current || stage !== "swiping" || !room) return;
+      if (swiping.current || stage !== "swiping" || !room) return false;
       const movie = movies[currentIndex];
-      if (!movie) return;
+      if (!movie) return false;
 
       swiping.current = true;
       setError("");
@@ -222,18 +223,20 @@ export default function RoomScreen() {
         const result = await api.createSwipe({ roomCode: room.code, movie, liked: direction === "like" });
         if (result.match) {
           showMatch(result.match);
-          return;
+          swiping.current = false;
+          return true;
         }
       } catch (e: any) {
         setError(e.message || "Failed to save swipe. Try again.");
         swiping.current = false;
-        return;
+        return false;
       }
 
       const next = currentIndex + 1;
       if (next >= movies.length) setStage("finished");
       else setCurrentIndex(next);
       swiping.current = false;
+      return true;
     },
     [currentIndex, movies, stage, room, showMatch]
   );
@@ -246,6 +249,16 @@ export default function RoomScreen() {
   const currentMovie = movies[currentIndex];
   const nextMovie = movies[currentIndex + 1];
   const roomCode = room?.code ?? codeParam ?? "";
+
+  useEffect(() => {
+    movies
+      .slice(currentIndex, currentIndex + 4)
+      .map((movie) => movie.poster)
+      .filter(Boolean)
+      .forEach((poster) => {
+        Image.prefetch(poster).catch(() => {});
+      });
+  }, [currentIndex, movies]);
 
   // ─── Toggle genre chip ──────────────────────────────────────────────────
   const toggleGenre = (id: number) => {
@@ -477,8 +490,8 @@ export default function RoomScreen() {
               <MovieCard
                 key={`bg-${nextMovie.id}`}
                 movie={nextMovie}
-                onSwipeLeft={() => {}}
-                onSwipeRight={() => {}}
+                onSwipeLeft={() => false}
+                onSwipeRight={() => false}
                 isTop={false}
                 stackIndex={1}
               />

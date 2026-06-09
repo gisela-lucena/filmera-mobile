@@ -34,8 +34,8 @@ export interface MovieCardRef {
 
 interface MovieCardProps {
   movie: Movie;
-  onSwipeLeft: () => void;
-  onSwipeRight: () => void;
+  onSwipeLeft: () => boolean | Promise<boolean>;
+  onSwipeRight: () => boolean | Promise<boolean>;
   isTop: boolean;
   stackIndex?: number;
 }
@@ -64,13 +64,16 @@ export const MovieCard = forwardRef<MovieCardRef, MovieCardProps>(
           toValue: { x, y: 0 },
           duration: SWIPE_OUT_DURATION,
           useNativeDriver: false,
-        }).start(() => {
-          position.setValue({ x: 0, y: 0 });
-          if (direction === "right") onSwipeRight();
-          else onSwipeLeft();
+        }).start(async () => {
+          const didSave =
+            direction === "right"
+              ? await onSwipeRight()
+              : await onSwipeLeft();
+
+          if (!didSave) resetPosition();
         });
       },
-      [position, onSwipeLeft, onSwipeRight]
+      [position, onSwipeLeft, onSwipeRight, resetPosition]
     );
 
     useImperativeHandle(ref, () => ({
@@ -145,6 +148,7 @@ export const MovieCard = forwardRef<MovieCardRef, MovieCardProps>(
           source={{ uri: movie.poster }}
           style={styles.poster}
           resizeMode="cover"
+          fadeDuration={0}
         />
 
         {/* Bottom gradient fade */}
