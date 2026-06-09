@@ -42,6 +42,7 @@
     "typescript": "~5.9.2"
   },
   "dependencies": {
-    "@expo-google-fonts/poppins": "^0.4.1"
+    "@expo-google-fonts/poppins": "^0.4.1",
+    "expo-video": "~3.0.16"
   }
 }

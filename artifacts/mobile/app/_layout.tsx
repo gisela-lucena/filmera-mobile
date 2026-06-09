@@ -12,13 +12,14 @@ import {
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
-import { Platform } from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { Platform, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { AppIntroVideo } from "@/components/AppIntroVideo";
 import { InfoToolTipProvider } from "@/components/InfoToolTip";
 import { AuthProvider } from "@/context/AuthContext";
 
@@ -72,6 +73,7 @@ function WebInteractionStyles() {
 }
 
 export default function RootLayout() {
+  const [showIntro, setShowIntro] = useState(true);
   const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -87,24 +89,31 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, fontError]);
 
+  const finishIntro = useCallback(() => {
+    setShowIntro(false);
+  }, []);
+
   if (!fontsLoaded && !fontError) return null;
 
   return (
-    <SafeAreaProvider>
-      <ErrorBoundary>
-        <AuthProvider>
-          <InfoToolTipProvider>
-            <QueryClientProvider client={queryClient}>
-              <WebInteractionStyles />
-              <GestureHandlerRootView style={{ flex: 1 }}>
-                <KeyboardProvider>
-                  <RootLayoutNav />
-                </KeyboardProvider>
-              </GestureHandlerRootView>
-            </QueryClientProvider>
-          </InfoToolTipProvider>
-        </AuthProvider>
-      </ErrorBoundary>
-    </SafeAreaProvider>
+    <View style={{ flex: 1, backgroundColor: "#0E051A" }}>
+      <SafeAreaProvider>
+        <ErrorBoundary>
+          <AuthProvider>
+            <InfoToolTipProvider>
+              <QueryClientProvider client={queryClient}>
+                <WebInteractionStyles />
+                <GestureHandlerRootView style={{ flex: 1 }}>
+                  <KeyboardProvider>
+                    <RootLayoutNav />
+                  </KeyboardProvider>
+                </GestureHandlerRootView>
+              </QueryClientProvider>
+            </InfoToolTipProvider>
+          </AuthProvider>
+        </ErrorBoundary>
+      </SafeAreaProvider>
+      {showIntro ? <AppIntroVideo onFinish={finishIntro} /> : null}
+    </View>
   );
 }
