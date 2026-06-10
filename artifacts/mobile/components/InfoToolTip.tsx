@@ -52,63 +52,65 @@ export function InfoToolTipProvider({
   return (
     <InfoToolTipContext.Provider value={value}>
       {children}
-      <Modal
-        visible={Boolean(tooltip)}
-        transparent
-        animationType="fade"
-        onRequestClose={closeInfoTooltip}
-      >
-        <Pressable style={styles.overlay} onPress={closeInfoTooltip}>
-          <Pressable
-            accessibilityRole="alert"
-            accessibilityLiveRegion="assertive"
-            style={[
-              styles.panel,
-              {
-                borderColor: isSuccess
-                  ? "rgba(255,214,0,0.45)"
-                  : "rgba(244,63,94,0.45)",
-              },
-            ]}
-            onPress={(event) => event.stopPropagation()}
-          >
+      {tooltip ? (
+        <Modal
+          visible
+          transparent
+          animationType="fade"
+          onRequestClose={closeInfoTooltip}
+        >
+          <Pressable style={styles.overlay} onPress={closeInfoTooltip}>
             <Pressable
-              onPress={closeInfoTooltip}
-              style={styles.closeButton}
-              accessibilityRole="button"
-              accessibilityLabel="Close message"
-            >
-              <Feather name="x" size={22} color="#B8A8CC" />
-            </Pressable>
-
-            <View
+              accessibilityRole="alert"
+              accessibilityLiveRegion="assertive"
               style={[
-                styles.iconCircle,
+                styles.panel,
                 {
-                  borderColor: isSuccess ? "#FFD600" : "#F43F5E",
+                  borderColor: isSuccess
+                    ? "rgba(255,214,0,0.45)"
+                    : "rgba(244,63,94,0.45)",
                 },
               ]}
+              onPress={(event) => event.stopPropagation()}
             >
-              <Text
+              <Pressable
+                onPress={closeInfoTooltip}
+                style={styles.closeButton}
+                accessibilityRole="button"
+                accessibilityLabel="Close message"
+              >
+                <Feather name="x" size={22} color="#B8A8CC" />
+              </Pressable>
+
+              <View
                 style={[
-                  styles.icon,
-                  { color: isSuccess ? "#FFD600" : "#F43F5E" },
+                  styles.iconCircle,
+                  {
+                    borderColor: isSuccess ? "#FFD600" : "#F43F5E",
+                  },
                 ]}
               >
-                {isSuccess ? "✓" : "✗"}
+                <Text
+                  style={[
+                    styles.icon,
+                    { color: isSuccess ? "#FFD600" : "#F43F5E" },
+                  ]}
+                >
+                  {isSuccess ? "✓" : "✗"}
+                </Text>
+              </View>
+              <Text
+                style={[
+                  styles.message,
+                  { color: isSuccess ? "#FFD600" : "#FDFBEF" },
+                ]}
+              >
+                {tooltip.message}
               </Text>
-            </View>
-            <Text
-              style={[
-                styles.message,
-                { color: isSuccess ? "#FFD600" : "#FDFBEF" },
-              ]}
-            >
-              {tooltip?.message}
-            </Text>
+            </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </Modal>
+      ) : null}
     </InfoToolTipContext.Provider>
   );
 }
