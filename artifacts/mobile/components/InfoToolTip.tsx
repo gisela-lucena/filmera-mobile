@@ -3,6 +3,7 @@ import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -38,6 +39,13 @@ export function InfoToolTipProvider({
     () => ({ showInfoTooltip, closeInfoTooltip }),
     [closeInfoTooltip, showInfoTooltip],
   );
+
+  useEffect(() => {
+    if (!tooltip) return;
+
+    const timeout = setTimeout(closeInfoTooltip, 3000);
+    return () => clearTimeout(timeout);
+  }, [closeInfoTooltip, tooltip]);
 
   const isSuccess = tooltip?.type === "success";
 
