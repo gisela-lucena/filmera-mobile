@@ -194,6 +194,12 @@ export const api = {
     return request<any>("/users/me").then((d) => d?.user ?? d);
   },
 
+  deleteAccount(): Promise<{ message: string }> {
+    return request<{ message: string }>("/users/me", {
+      method: "DELETE",
+    });
+  },
+
   async createRoom(movies: Movie[]): Promise<Room> {
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
     const payload = {

@@ -596,6 +596,45 @@ function createRouter() {
     res.json({ user: publicUser(req.user) });
   });
 
+  router.delete("/users/me", requireUser, async (req, res, next) => {
+    try {
+      const userId = req.user._id;
+
+      if (mongoReady) {
+        await Promise.all([
+          Swipe.deleteMany({ userId }),
+          Room.updateMany(
+            { participants: userId },
+            { $pull: { participants: userId } },
+          ),
+        ]);
+        await User.deleteOne({ _id: userId });
+      } else {
+        memory.swipes = memory.swipes.filter(
+          (swipe) => String(swipe.userId) !== String(userId),
+        );
+
+        for (const room of memory.rooms) {
+          const previousCount = room.participants.length;
+          room.participants = room.participants.filter(
+            (participantId) => String(participantId) !== String(userId),
+          );
+          if (room.participants.length !== previousCount) {
+            broadcastRoom(room);
+          }
+        }
+
+        memory.users = memory.users.filter(
+          (user) => String(user._id) !== String(userId),
+        );
+      }
+
+      return res.json({ message: "Account deleted permanently" });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
   router.get("/movies", (_req, res) => {
     res.json({ movies: fallbackMovies });
   });

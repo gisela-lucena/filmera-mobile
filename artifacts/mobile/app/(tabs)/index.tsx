@@ -248,11 +248,23 @@ export default function HomeScreen() {
                 Signed in as{" "}
                 <Text style={{ color: colors.foreground }}>{user.name}</Text>
               </Text>
-              <Pressable onPress={logout}>
-                <Text style={[styles.authLink, { color: colors.accent }]}>
-                  Sign out
-                </Text>
-              </Pressable>
+              <View style={styles.authActions}>
+                <Pressable onPress={() => router.push("/account-settings")}>
+                  <Text style={[styles.authLink, { color: colors.accent }]}>
+                    Account Settings
+                  </Text>
+                </Pressable>
+                <Pressable onPress={logout}>
+                  <Text
+                    style={[
+                      styles.authLink,
+                      { color: colors.mutedForeground },
+                    ]}
+                  >
+                    Sign out
+                  </Text>
+                </Pressable>
+              </View>
             </View>
           ) : (
             <View style={styles.authBar}>
@@ -820,6 +832,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   authBarText: { fontSize: 13, fontFamily: "Inter_400Regular", flex: 1 },
+  authActions: { alignItems: "flex-end", gap: 8 },
   authLink: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   actions: { gap: 12 },
   primaryBtn: {
