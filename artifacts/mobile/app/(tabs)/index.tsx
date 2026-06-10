@@ -7,7 +7,6 @@ import {
   ActivityIndicator,
   Image,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -388,13 +387,8 @@ export default function HomeScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Auth Modal */}
-      <Modal
-        visible={authModal !== "none"}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setAuthModal("none")}
-      >
+      {/* Auth sheet */}
+      {authModal !== "none" ? (
         <KeyboardAvoidingView
           style={styles.modalKeyboardView}
           behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -786,7 +780,7 @@ export default function HomeScreen() {
             </Pressable>
           </Pressable>
         </KeyboardAvoidingView>
-      </Modal>
+      ) : null}
     </View>
   );
 }
@@ -876,7 +870,10 @@ const styles = StyleSheet.create({
   howRow: { flexDirection: "row", alignItems: "center", gap: 14 },
   howEmoji: { fontSize: 20, width: 30, textAlign: "center" },
   howText: { fontSize: 14, fontFamily: "Inter_400Regular" },
-  modalKeyboardView: { flex: 1 },
+  modalKeyboardView: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 10,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.7)",
