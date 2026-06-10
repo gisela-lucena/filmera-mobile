@@ -123,7 +123,9 @@ export default function AccountSettingsScreen() {
         </View>
 
         <Pressable
-          onPress={() => Linking.openURL("https://filmera.us/privacy")}
+          onPress={() =>
+            Linking.openURL("https://filmera-mobile.onrender.com/privacy")
+          }
           style={({ pressed }) => [
             styles.policyButton,
             { opacity: pressed ? 0.7 : 1 },
