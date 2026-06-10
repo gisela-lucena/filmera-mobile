@@ -6,6 +6,7 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -67,6 +68,18 @@ export default function HomeScreen() {
     router.setParams({ passwordReset: undefined });
   }, [params.passwordReset, router]);
 
+  useEffect(() => {
+    if (!user) return;
+
+    Keyboard.dismiss();
+    setAuthModal("none");
+  }, [user]);
+
+  const closeAuth = () => {
+    Keyboard.dismiss();
+    setAuthModal("none");
+  };
+
   const openLogin = () => {
     setAuthError("");
     setLoginEmail("");
@@ -99,8 +112,9 @@ export default function HomeScreen() {
     try {
       setAuthLoading(true);
       setAuthError("");
+      Keyboard.dismiss();
       await login(email, loginPassword);
-      setAuthModal("none");
+      closeAuth();
     } catch (e: any) {
       setAuthError(e.message || "Login failed");
     } finally {
@@ -396,7 +410,7 @@ export default function HomeScreen() {
         >
           <Pressable
             style={styles.modalOverlay}
-            onPress={() => setAuthModal("none")}
+            onPress={closeAuth}
           >
             <Pressable
               style={styles.modalSheet}
