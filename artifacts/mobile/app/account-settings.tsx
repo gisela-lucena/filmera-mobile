@@ -6,6 +6,7 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -121,6 +122,29 @@ export default function AccountSettingsScreen() {
           </View>
         </View>
 
+        <Pressable
+          onPress={() => Linking.openURL("https://filmera.us/privacy")}
+          style={({ pressed }) => [
+            styles.policyButton,
+            { opacity: pressed ? 0.7 : 1 },
+          ]}
+        >
+          <View style={styles.policyIcon}>
+            <Feather name="shield" size={20} color={colors.accent} />
+          </View>
+          <View style={styles.policyCopy}>
+            <Text style={styles.policyTitle}>Privacy Policy</Text>
+            <Text style={[styles.policyDescription, { color: colors.mutedForeground }]}>
+              Learn how FILMERA handles your information.
+            </Text>
+          </View>
+          <Feather
+            name="external-link"
+            size={19}
+            color={colors.mutedForeground}
+          />
+        </Pressable>
+
         <View style={styles.dangerCard}>
           <Text style={styles.dangerTitle}>Delete Account</Text>
           <Text
@@ -214,6 +238,36 @@ const styles = StyleSheet.create({
     fontSize: 17,
   },
   email: { fontFamily: "Inter_400Regular", fontSize: 14 },
+  policyButton: {
+    minHeight: 76,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    padding: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  policyIcon: {
+    width: 42,
+    height: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 21,
+    backgroundColor: "rgba(255,214,0,0.1)",
+  },
+  policyCopy: { flex: 1, gap: 3 },
+  policyTitle: {
+    color: "#FDFBEF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 16,
+  },
+  policyDescription: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    lineHeight: 18,
+  },
   dangerCard: {
     gap: 14,
     padding: 20,

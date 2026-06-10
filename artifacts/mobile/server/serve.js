@@ -15,6 +15,14 @@ const path = require("path");
 
 const STATIC_ROOT = path.resolve(__dirname, "..", "static-build");
 const TEMPLATE_PATH = path.resolve(__dirname, "templates", "landing-page.html");
+const PRIVACY_POLICY_PATH = path.resolve(
+  __dirname,
+  "..",
+  "..",
+  "..",
+  "privacy",
+  "index.html",
+);
 const basePath = (process.env.BASE_PATH || "/").replace(/\/+$/, "");
 
 const MIME_TYPES = {
@@ -124,6 +132,13 @@ const server = http.createServer((req, res) => {
     if (pathname === "/") {
       return serveLandingPage(req, res, landingPageTemplate, appName);
     }
+  }
+
+  if (pathname === "/privacy" || pathname === "/privacy/") {
+    const privacyPolicy = fs.readFileSync(PRIVACY_POLICY_PATH);
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    res.end(privacyPolicy);
+    return;
   }
 
   serveStaticFile(pathname, res);
