@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
   },
   email: { fontFamily: "Inter_400Regular", fontSize: 14 },
   policyButton: {
-    minHeight: 76,
+    height: 76,
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
@@ -302,11 +302,11 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   dangerCard: {
-    minHeight: 76,
+    height: 76,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    padding: 12,
+    gap: 14,
+    padding: 16,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: "rgba(244,63,94,0.45)",
