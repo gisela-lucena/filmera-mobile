@@ -174,13 +174,21 @@ export default function AccountSettingsScreen() {
         </Pressable>
 
         <View style={styles.dangerCard}>
-          <Text style={styles.dangerTitle}>Delete Account</Text>
-          <Text
-            style={[styles.dangerDescription, { color: colors.mutedForeground }]}
-          >
-            Permanently deletes your user profile and swipe history, and removes
-            you from every room.
-          </Text>
+          <View style={styles.dangerIcon}>
+            <Feather name="trash-2" size={20} color="#F43F5E" />
+          </View>
+          <View style={styles.dangerCopy}>
+            <Text style={styles.dangerTitle}>Delete Account</Text>
+            <Text
+              style={[
+                styles.dangerDescription,
+                { color: colors.mutedForeground },
+              ]}
+              numberOfLines={1}
+            >
+              Permanently delete your account.
+            </Text>
+          </View>
           <Pressable
             onPress={confirmDelete}
             disabled={isDeleting}
@@ -190,12 +198,9 @@ export default function AccountSettingsScreen() {
             ]}
           >
             {isDeleting ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
-              <>
-                <Feather name="trash-2" size={18} color="#FFFFFF" />
-                <Text style={styles.deleteButtonText}>Delete Account</Text>
-              </>
+              <Text style={styles.deleteButtonText}>Delete</Text>
             )}
           </Pressable>
         </View>
@@ -297,35 +302,47 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   dangerCard: {
-    gap: 14,
-    padding: 20,
+    minHeight: 76,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 12,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: "rgba(244,63,94,0.45)",
     backgroundColor: "rgba(244,63,94,0.08)",
   },
+  dangerIcon: {
+    width: 42,
+    height: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 21,
+    backgroundColor: "rgba(244,63,94,0.12)",
+  },
+  dangerCopy: { flex: 1, gap: 3 },
   dangerTitle: {
     color: "#F43F5E",
-    fontFamily: "Poppins_800ExtraBold",
-    fontSize: 20,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 16,
   },
   dangerDescription: {
     fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    lineHeight: 21,
+    fontSize: 12,
+    lineHeight: 17,
   },
   deleteButton: {
-    height: 52,
-    borderRadius: 13,
-    flexDirection: "row",
+    minWidth: 62,
+    height: 34,
+    paddingHorizontal: 12,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    gap: 9,
     backgroundColor: "#D91E3D",
   },
   deleteButtonText: {
     color: "#FFFFFF",
     fontFamily: "Inter_700Bold",
-    fontSize: 15,
+    fontSize: 12,
   },
 });

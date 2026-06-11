@@ -759,34 +759,43 @@ export default function HomeScreen() {
                       ) : null}
                     </View>
 
-                    <Text
-                      style={[
-                        styles.consentText,
-                        { color: colors.mutedForeground },
-                      ]}
-                    >
-                      By creating an account, you agree to our{" "}
+                    <View style={styles.consentBlock}>
                       <Text
-                        style={[styles.consentLink, { color: colors.accent }]}
-                        onPress={() =>
-                          Linking.openURL("https://filmera.us/privacy")
-                        }
-                        accessibilityRole="link"
+                        style={[
+                          styles.consentText,
+                          { color: colors.mutedForeground },
+                        ]}
                       >
-                        Privacy Policy
-                      </Text>{" "}
-                      and{" "}
-                      <Text
-                        style={[styles.consentLink, { color: colors.accent }]}
-                        onPress={() =>
-                          Linking.openURL("https://filmera.us/terms")
-                        }
-                        accessibilityRole="link"
-                      >
-                        Terms of Use
+                        By creating an account, you agree to our{" "}
+                        <Text
+                          style={[styles.consentLink, { color: colors.accent }]}
+                          onPress={() =>
+                            Linking.openURL("https://filmera.us/privacy")
+                          }
+                          accessibilityRole="link"
+                        >
+                          Privacy Policy
+                        </Text>
                       </Text>
-                      .
-                    </Text>
+                      <Text
+                        style={[
+                          styles.consentText,
+                          { color: colors.mutedForeground },
+                        ]}
+                      >
+                        and{" "}
+                        <Text
+                          style={[styles.consentLink, { color: colors.accent }]}
+                          onPress={() =>
+                            Linking.openURL("https://filmera.us/terms")
+                          }
+                          accessibilityRole="link"
+                        >
+                          Terms of Use
+                        </Text>
+                        .
+                      </Text>
+                    </View>
 
                     <Pressable
                       onPress={handleRegister}
@@ -980,6 +989,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     color: "#4ADE80",
   },
+  consentBlock: { alignItems: "center" },
   consentText: {
     fontSize: 12,
     fontFamily: "Inter_400Regular",
