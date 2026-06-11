@@ -4,11 +4,24 @@ import { Platform } from "react-native";
 // Provide a minimal "process.env" typing for environments without @types/node
 declare const process: { env: { [key: string]: string | undefined } };
 
+function requireSecureNativeOrigin(origin: string, label: string): string {
+  const normalized = origin.replace(/\/$/, "");
+
+  if (Platform.OS !== "web" && !normalized.startsWith("https://")) {
+    throw new Error(`${label} must use HTTPS in the mobile app`);
+  }
+
+  return normalized;
+}
+
 // Web can use the local API proxy. Native apps cannot use a relative /api URL,
 // so the iOS/Android preview talks directly to the deployed backend.
 const DOMAIN = process.env["EXPO_PUBLIC_DOMAIN"] ?? "";
-const API_ORIGIN =
-  process.env["EXPO_PUBLIC_API_URL"] ?? "https://filmera-mobile.onrender.com";
+const API_ORIGIN = requireSecureNativeOrigin(
+  process.env["EXPO_PUBLIC_API_URL"] ??
+    "https://filmera-mobile.onrender.com",
+  "EXPO_PUBLIC_API_URL",
+);
 const BASE_URL = DOMAIN
   ? `https://${DOMAIN}/api/filmera`
   : Platform.OS === "web"
@@ -122,10 +135,16 @@ function getExtraConfigValue(key: string): string {
 }
 
 function toWebSocketOrigin(origin: string): string {
-  return origin
+  const normalized = origin
     .replace(/^http:/, "ws:")
     .replace(/^https:/, "wss:")
     .replace(/\/$/, "");
+
+  if (Platform.OS !== "web" && !normalized.startsWith("wss://")) {
+    throw new Error("EXPO_PUBLIC_WS_URL must use WSS in the mobile app");
+  }
+
+  return normalized;
 }
 
 export function getRealtimeUrl(path: string): string {
