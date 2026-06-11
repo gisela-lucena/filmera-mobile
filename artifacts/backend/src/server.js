@@ -6,8 +6,6 @@ import http from "node:http";
 import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { WebSocket, WebSocketServer } from "ws";
 
 const PORT = Number(process.env.PORT || 3000);
@@ -23,9 +21,6 @@ const PUBLIC_BACKEND_URL = (
 ).replace(/\/$/, "");
 const RESEND_API_URL =
   process.env.RESEND_API_URL || "https://api.resend.com/emails";
-const PRIVACY_POLICY_PATH = fileURLToPath(
-  new URL("../../../privacy/index.html", import.meta.url),
-);
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || "*")
   .split(",")
   .map((origin) => origin.trim())
@@ -401,10 +396,6 @@ function createRouter() {
 
   router.get("/health", (_req, res) => {
     res.json({ ok: true, database: mongoReady ? "mongodb" : "memory" });
-  });
-
-  router.get("/privacy", (_req, res) => {
-    res.sendFile(path.resolve(PRIVACY_POLICY_PATH));
   });
 
   router.get("/open-reset-password", (req, res) => {
