@@ -20,4 +20,5 @@ onlyBuiltDependencies:
   - esbuild
 
 allowBuilds:
+  dtrace-provider: false
   esbuild: true
