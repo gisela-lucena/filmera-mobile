@@ -145,6 +145,34 @@ export default function AccountSettingsScreen() {
           />
         </Pressable>
 
+        <Pressable
+          onPress={() => Linking.openURL("https://filmera.us/terms")}
+          style={({ pressed }) => [
+            styles.policyButton,
+            { opacity: pressed ? 0.7 : 1 },
+          ]}
+        >
+          <View style={styles.policyIcon}>
+            <Feather name="file-text" size={20} color={colors.accent} />
+          </View>
+          <View style={styles.policyCopy}>
+            <Text style={styles.policyTitle}>Terms of Use</Text>
+            <Text
+              style={[
+                styles.policyDescription,
+                { color: colors.mutedForeground },
+              ]}
+            >
+              Review the rules for using FILMERA.
+            </Text>
+          </View>
+          <Feather
+            name="external-link"
+            size={19}
+            color={colors.mutedForeground}
+          />
+        </Pressable>
+
         <View style={styles.dangerCard}>
           <Text style={styles.dangerTitle}>Delete Account</Text>
           <Text
