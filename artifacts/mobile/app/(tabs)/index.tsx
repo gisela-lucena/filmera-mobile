@@ -8,6 +8,7 @@ import {
   Image,
   Keyboard,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -758,6 +759,35 @@ export default function HomeScreen() {
                       ) : null}
                     </View>
 
+                    <Text
+                      style={[
+                        styles.consentText,
+                        { color: colors.mutedForeground },
+                      ]}
+                    >
+                      By creating an account, you agree to our{" "}
+                      <Text
+                        style={[styles.consentLink, { color: colors.accent }]}
+                        onPress={() =>
+                          Linking.openURL("https://filmera.us/privacy")
+                        }
+                        accessibilityRole="link"
+                      >
+                        Privacy Policy
+                      </Text>{" "}
+                      and{" "}
+                      <Text
+                        style={[styles.consentLink, { color: colors.accent }]}
+                        onPress={() =>
+                          Linking.openURL("https://filmera.us/terms")
+                        }
+                        accessibilityRole="link"
+                      >
+                        Terms of Use
+                      </Text>
+                      .
+                    </Text>
+
                     <Pressable
                       onPress={handleRegister}
                       disabled={authLoading}
@@ -950,6 +980,13 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     color: "#4ADE80",
   },
+  consentText: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 18,
+    textAlign: "center",
+  },
+  consentLink: { fontFamily: "Inter_700Bold" },
   errorText: { fontSize: 13, fontFamily: "Inter_400Regular" },
   switchRow: { alignItems: "center", paddingVertical: 4 },
   switchText: { fontSize: 13, fontFamily: "Inter_400Regular" },
