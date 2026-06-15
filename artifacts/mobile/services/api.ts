@@ -373,7 +373,10 @@ async function fetchTmdbMoviesWithFilters(
         language: "en-US",
         page: String(index + 1),
         region: WATCH_REGION,
+        "vote_count.gte": "80",
         "release_date.lte": new Date().toISOString().slice(0, 10),
+        watch_region: WATCH_REGION,
+        with_watch_monetization_types: "flatrate|rent|buy|ads|free",
       });
 
       if (filters.genres?.length) {
