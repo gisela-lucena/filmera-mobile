@@ -488,7 +488,10 @@ function createRouter() {
         return res.status(401).json({ message: "Invalid email or password" });
       }
 
-      return res.json({ token: signToken(user) });
+      return res.json({
+        token: signToken(user),
+        user: publicUser(user),
+      });
     } catch (error) {
       return next(error);
     }

@@ -170,6 +170,10 @@ export function getRealtimeUrl(path: string): string {
 }
 
 export const api = {
+  warmup(): Promise<void> {
+    return request<{ ok: boolean }>("/health").then(() => undefined);
+  },
+
   signup(body: { name: string; email: string; password: string }) {
     return request<{ message: string; user: User }>("/signup", {
       method: "POST",
@@ -181,7 +185,7 @@ export const api = {
   },
 
   async signin(body: { email: string; password: string }): Promise<User> {
-    const data = await request<{ token: string }>("/signin", {
+    const data = await request<{ token: string; user?: User }>("/signin", {
       method: "POST",
       body: JSON.stringify({
         ...body,
@@ -189,8 +193,7 @@ export const api = {
       }),
     });
     setToken(data.token);
-    const user = await api.getCurrentUser();
-    return user;
+    return data.user ?? api.getCurrentUser();
   },
 
   forgotPassword(body: { email: string }) {

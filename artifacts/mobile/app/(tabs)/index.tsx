@@ -76,6 +76,11 @@ export default function HomeScreen() {
     setAuthModal("none");
   }, [user]);
 
+  useEffect(() => {
+    if (authModal === "none") return;
+    void api.warmup().catch(() => undefined);
+  }, [authModal]);
+
   const closeAuth = () => {
     Keyboard.dismiss();
     setAuthModal("none");

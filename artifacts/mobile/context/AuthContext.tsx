@@ -18,6 +18,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    void api.warmup().catch(() => undefined);
+
     (async () => {
       try {
         const token = await AsyncStorage.getItem("jwt");
