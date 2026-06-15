@@ -28,7 +28,10 @@ const BASE_URL = DOMAIN
     ? "/api/filmera"
     : API_ORIGIN;
 
-const g = globalThis as typeof globalThis & { _filmeraToken?: string | null };
+const g = globalThis as typeof globalThis & {
+  _filmeraToken?: string | null;
+  _filmeraWarmup?: Promise<void>;
+};
 
 export function getToken(): string | null {
   return g._filmeraToken ?? null;
@@ -73,6 +76,23 @@ function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
       ...(options.headers ?? {}),
     },
   }).then((res) => handleResponse<T>(res));
+}
+
+function warmupBackend(): Promise<void> {
+  if (g._filmeraWarmup) return g._filmeraWarmup;
+
+  const requestPromise = request<{ ok: boolean }>("/health").then(
+    () => undefined,
+  );
+  const trackedWarmup = requestPromise.finally(() => {
+    if (g._filmeraWarmup === trackedWarmup) g._filmeraWarmup = undefined;
+  });
+  g._filmeraWarmup = trackedWarmup;
+  return g._filmeraWarmup;
+}
+
+if (Platform.OS !== "web") {
+  void warmupBackend().catch(() => undefined);
 }
 
 export interface User {
@@ -171,7 +191,7 @@ export function getRealtimeUrl(path: string): string {
 
 export const api = {
   warmup(): Promise<void> {
-    return request<{ ok: boolean }>("/health").then(() => undefined);
+    return warmupBackend();
   },
 
   signup(body: { name: string; email: string; password: string }) {
@@ -185,6 +205,8 @@ export const api = {
   },
 
   async signin(body: { email: string; password: string }): Promise<User> {
+    await g._filmeraWarmup?.catch(() => undefined);
+
     const data = await request<{ token: string; user?: User }>("/signin", {
       method: "POST",
       body: JSON.stringify({
@@ -289,8 +311,6 @@ export interface FilterOptions {
 }
 
 const WATCH_REGION = "US";
-const WATCH_PROVIDER_KEYS = ["flatrate", "rent", "buy", "ads", "free"];
-const HOME_RELEASE_TYPES = new Set([4, 5, 6]);
 const TMDB_MOVIE_PAGE_COUNT = 5;
 
 function getTmdbToken(): string {
@@ -326,32 +346,6 @@ function normalizeTmdbMovie(movie: any): Movie {
   };
 }
 
-async function hasHomeWatchAvailability(
-  movieId: number,
-  token: string,
-): Promise<boolean> {
-  const data = await tmdbFetch<any>(
-    `/movie/${movieId}?append_to_response=watch/providers,release_dates`,
-    token,
-  );
-  const providers = data?.["watch/providers"]?.results?.[WATCH_REGION];
-  const hasProvider = WATCH_PROVIDER_KEYS.some(
-    (key) => Array.isArray(providers?.[key]) && providers[key].length > 0,
-  );
-  if (!hasProvider) return false;
-
-  const countryReleases = data?.release_dates?.results?.find(
-    (result: any) => result?.iso_3166_1 === WATCH_REGION,
-  );
-  const now = Date.now();
-
-  return (countryReleases?.release_dates ?? []).some((release: any) => {
-    if (!HOME_RELEASE_TYPES.has(Number(release?.type))) return false;
-    const releaseTime = Date.parse(release?.release_date ?? "");
-    return Number.isFinite(releaseTime) && releaseTime <= now;
-  });
-}
-
 function sortMovies(movies: Movie[], sort = "popularity.desc"): Movie[] {
   const sorted = [...movies];
 
@@ -364,27 +358,6 @@ function sortMovies(movies: Movie[], sort = "popularity.desc"): Movie[] {
   }
 
   return sorted;
-}
-
-async function filterByWatchAvailability(
-  movies: Movie[],
-  tmdbToken = getTmdbToken(),
-): Promise<Movie[]> {
-  if (!tmdbToken) return movies;
-
-  const availability = await Promise.all(
-    movies.map(async (movie) => ({
-      movie,
-      available: await hasHomeWatchAvailability(
-        movie.tmdbId ?? movie.id,
-        tmdbToken,
-      ),
-    })),
-  );
-
-  return availability
-    .filter(({ available }) => available)
-    .map(({ movie }) => movie);
 }
 
 async function fetchTmdbMoviesWithFilters(
@@ -403,7 +376,6 @@ async function fetchTmdbMoviesWithFilters(
         "vote_count.gte": "80",
         "release_date.lte": new Date().toISOString().slice(0, 10),
         watch_region: WATCH_REGION,
-        with_release_type: "4|5|6",
         with_watch_monetization_types: "flatrate|rent|buy|ads|free",
       });
 
@@ -452,13 +424,9 @@ export async function fetchMoviesWithFilters(
 
   if (tmdbToken) {
     const tmdbMovies = await fetchTmdbMoviesWithFilters(filters, tmdbToken);
-    const availableMovies = await filterByWatchAvailability(
-      tmdbMovies,
-      tmdbToken,
-    );
 
-    if (availableMovies.length > 0) {
-      return sortMovies(availableMovies, filters.sort).slice(0, 100);
+    if (tmdbMovies.length > 0) {
+      return sortMovies(tmdbMovies, filters.sort).slice(0, 100);
     }
   }
 
