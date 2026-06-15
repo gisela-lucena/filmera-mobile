@@ -290,6 +290,7 @@ export interface FilterOptions {
 
 const WATCH_REGION = "US";
 const WATCH_PROVIDER_KEYS = ["flatrate", "rent", "buy", "ads", "free"];
+const HOME_RELEASE_TYPES = new Set([4, 5, 6]);
 const TMDB_MOVIE_PAGE_COUNT = 5;
 
 function getTmdbToken(): string {
@@ -325,16 +326,30 @@ function normalizeTmdbMovie(movie: any): Movie {
   };
 }
 
-async function hasWatchAvailability(
+async function hasHomeWatchAvailability(
   movieId: number,
   token: string,
 ): Promise<boolean> {
-  const data = await tmdbFetch<any>(`/movie/${movieId}/watch/providers`, token);
-  const region = data?.results?.[WATCH_REGION];
-  if (!region) return false;
-  return WATCH_PROVIDER_KEYS.some(
-    (key) => Array.isArray(region[key]) && region[key].length > 0,
+  const data = await tmdbFetch<any>(
+    `/movie/${movieId}?append_to_response=watch/providers,release_dates`,
+    token,
   );
+  const providers = data?.["watch/providers"]?.results?.[WATCH_REGION];
+  const hasProvider = WATCH_PROVIDER_KEYS.some(
+    (key) => Array.isArray(providers?.[key]) && providers[key].length > 0,
+  );
+  if (!hasProvider) return false;
+
+  const countryReleases = data?.release_dates?.results?.find(
+    (result: any) => result?.iso_3166_1 === WATCH_REGION,
+  );
+  const now = Date.now();
+
+  return (countryReleases?.release_dates ?? []).some((release: any) => {
+    if (!HOME_RELEASE_TYPES.has(Number(release?.type))) return false;
+    const releaseTime = Date.parse(release?.release_date ?? "");
+    return Number.isFinite(releaseTime) && releaseTime <= now;
+  });
 }
 
 function sortMovies(movies: Movie[], sort = "popularity.desc"): Movie[] {
@@ -360,7 +375,7 @@ async function filterByWatchAvailability(
   const availability = await Promise.all(
     movies.map(async (movie) => ({
       movie,
-      available: await hasWatchAvailability(
+      available: await hasHomeWatchAvailability(
         movie.tmdbId ?? movie.id,
         tmdbToken,
       ),
@@ -384,8 +399,11 @@ async function fetchTmdbMoviesWithFilters(
         include_video: "false",
         language: "en-US",
         page: String(index + 1),
+        region: WATCH_REGION,
         "vote_count.gte": "80",
+        "release_date.lte": new Date().toISOString().slice(0, 10),
         watch_region: WATCH_REGION,
+        with_release_type: "4|5|6",
         with_watch_monetization_types: "flatrate|rent|buy|ads|free",
       });
 
