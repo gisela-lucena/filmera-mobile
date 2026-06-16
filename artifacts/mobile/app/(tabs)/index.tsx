@@ -404,6 +404,23 @@ export default function HomeScreen() {
               </View>
             ))}
           </View>
+
+          <Pressable
+            onPress={() => Linking.openURL("https://www.themoviedb.org/")}
+            style={styles.homeAttribution}
+            accessibilityRole="link"
+            accessibilityLabel="Movie data by TMDB"
+          >
+            <Text
+              style={[
+                styles.homeAttributionText,
+                { color: colors.mutedForeground },
+              ]}
+            >
+              Movie data by{" "}
+              <Text style={{ color: colors.accent }}>TMDB</Text>
+            </Text>
+          </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -583,6 +600,32 @@ export default function HomeScreen() {
                       >
                         Don't have an account?{" "}
                         <Text style={{ color: colors.accent }}>Create one</Text>
+                      </Text>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={() =>
+                        Linking.openURL("https://www.themoviedb.org/")
+                      }
+                      style={styles.tmdbAttribution}
+                      accessibilityRole="link"
+                      accessibilityLabel="Movie data by TMDB"
+                    >
+                      <Text
+                        style={[
+                          styles.tmdbAttributionText,
+                          { color: colors.mutedForeground },
+                        ]}
+                      >
+                        Movie data by{" "}
+                        <Text
+                          style={[
+                            styles.tmdbAttributionLink,
+                            { color: colors.accent },
+                          ]}
+                        >
+                          TMDB
+                        </Text>
                       </Text>
                     </Pressable>
                   </>
@@ -832,6 +875,32 @@ export default function HomeScreen() {
                         <Text style={{ color: colors.accent }}>Log in</Text>
                       </Text>
                     </Pressable>
+
+                    <Pressable
+                      onPress={() =>
+                        Linking.openURL("https://www.themoviedb.org/")
+                      }
+                      style={styles.tmdbAttribution}
+                      accessibilityRole="link"
+                      accessibilityLabel="Movie data by TMDB"
+                    >
+                      <Text
+                        style={[
+                          styles.tmdbAttributionText,
+                          { color: colors.mutedForeground },
+                        ]}
+                      >
+                        Movie data by{" "}
+                        <Text
+                          style={[
+                            styles.tmdbAttributionLink,
+                            { color: colors.accent },
+                          ]}
+                        >
+                          TMDB
+                        </Text>
+                      </Text>
+                    </Pressable>
                   </>
                 )}
               </ScrollView>
@@ -928,6 +997,17 @@ const styles = StyleSheet.create({
   howRow: { flexDirection: "row", alignItems: "center", gap: 14 },
   howEmoji: { fontSize: 20, width: 30, textAlign: "center" },
   howText: { fontSize: 14, fontFamily: "Inter_400Regular" },
+  homeAttribution: {
+    minHeight: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: -8,
+  },
+  homeAttributionText: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+    letterSpacing: 0.2,
+  },
   modalKeyboardView: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 10,
@@ -1005,4 +1085,15 @@ const styles = StyleSheet.create({
   errorText: { fontSize: 13, fontFamily: "Inter_400Regular" },
   switchRow: { alignItems: "center", paddingVertical: 4 },
   switchText: { fontSize: 13, fontFamily: "Inter_400Regular" },
+  tmdbAttribution: {
+    minHeight: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tmdbAttributionText: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+    letterSpacing: 0.2,
+  },
+  tmdbAttributionLink: { fontFamily: "Inter_700Bold" },
 });

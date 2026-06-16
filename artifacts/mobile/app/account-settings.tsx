@@ -173,6 +173,35 @@ export default function AccountSettingsScreen() {
           />
         </Pressable>
 
+        <View style={styles.creditsCard}>
+          <View style={styles.policyIcon}>
+            <Feather name="film" size={20} color={colors.accent} />
+          </View>
+          <View style={styles.policyCopy}>
+            <Text style={styles.policyTitle}>Credits</Text>
+            <Text
+              style={[
+                styles.policyDescription,
+                { color: colors.mutedForeground },
+              ]}
+            >
+              This product uses the TMDB API but is not endorsed or certified by
+              TMDB.
+            </Text>
+            <Pressable
+              onPress={() => Linking.openURL("https://www.themoviedb.org/")}
+              style={styles.attributionLink}
+              accessibilityRole="link"
+              accessibilityLabel="Movie data by TMDB"
+            >
+              <Text style={[styles.attributionText, { color: colors.accent }]}>
+                Movie data by TMDB
+              </Text>
+              <Feather name="external-link" size={14} color={colors.accent} />
+            </Pressable>
+          </View>
+        </View>
+
         <View style={styles.dangerCard}>
           <View style={styles.dangerIcon}>
             <Feather name="trash-2" size={20} color="#F43F5E" />
@@ -300,6 +329,30 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 13,
     lineHeight: 18,
+  },
+  creditsCard: {
+    minHeight: 108,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 14,
+    padding: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  attributionLink: {
+    minHeight: 28,
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 6,
+    marginTop: 2,
+  },
+  attributionText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+    letterSpacing: 0.2,
   },
   dangerCard: {
     height: 76,
