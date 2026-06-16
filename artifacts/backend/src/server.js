@@ -337,23 +337,35 @@ async function addParticipant(room, userId) {
   return room;
 }
 
-async function findMatch(roomCode, movieId, currentUserId) {
+async function hasUnanimousMatch(room, roomCode, movieId) {
+  const participantIds = (room.participants || []).map(String);
+  if (participantIds.length < 2) return false;
+
   if (mongoReady) {
-    return Swipe.findOne({
+    const likedUserIds = await Swipe.distinct("userId", {
       roomCode,
       movieId,
       liked: true,
-      userId: { $ne: currentUserId },
+      userId: { $in: room.participants || [] },
     });
+
+    const likedUsers = new Set(likedUserIds.map(String));
+    return participantIds.every((id) => likedUsers.has(id));
   }
 
-  return memory.swipes.find(
-    (swipe) =>
-      swipe.roomCode === roomCode &&
-      swipe.movieId === movieId &&
-      swipe.liked &&
-      String(swipe.userId) !== String(currentUserId),
+  const likedUsers = new Set(
+    memory.swipes
+      .filter(
+        (swipe) =>
+          swipe.roomCode === roomCode &&
+          swipe.movieId === movieId &&
+          swipe.liked &&
+          participantIds.includes(String(swipe.userId)),
+      )
+      .map((swipe) => String(swipe.userId)),
   );
+
+  return participantIds.every((id) => likedUsers.has(id));
 }
 
 async function upsertSwipe({ roomCode, userId, movieId, liked }) {
@@ -740,8 +752,8 @@ function createRouter() {
       await upsertSwipe({ roomCode, userId: req.user._id, movieId, liked });
 
       if (liked && !room.matchedMovie) {
-        const match = await findMatch(roomCode, movieId, req.user._id);
-        if (match) {
+        const hasMatch = await hasUnanimousMatch(room, roomCode, movieId);
+        if (hasMatch) {
           const movie = (room.movies || []).find(
             (item) => Number(item.tmdbId ?? item.id) === movieId,
           );
