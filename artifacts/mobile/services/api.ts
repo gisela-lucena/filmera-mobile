@@ -143,6 +143,17 @@ export function normalizeRoom(data: any): Room {
   };
 }
 
+function serializeMovies(movies: Movie[]) {
+  return movies.map((m) => ({
+    tmdbId: m.tmdbId ?? m.id,
+    title: m.title,
+    year: m.year,
+    rating: m.rating,
+    overview: m.overview,
+    poster: m.poster,
+  }));
+}
+
 function getExtraConfigValue(key: string): string {
   const envValue = process.env[key];
   const extraValue = Constants.expoConfig?.extra?.[key];
@@ -244,23 +255,27 @@ export const api = {
     });
   },
 
-  async createRoom(movies: Movie[]): Promise<Room> {
+  async createRoom(movies: Movie[] = []): Promise<Room> {
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
     const payload = {
       code,
-      movies: movies.map((m) => ({
-        tmdbId: m.tmdbId ?? m.id,
-        title: m.title,
-        year: m.year,
-        rating: m.rating,
-        overview: m.overview,
-        poster: m.poster,
-      })),
+      movies: serializeMovies(movies),
     };
     const data = await request<any>("/rooms", {
       method: "POST",
       body: JSON.stringify(payload),
     });
+    return normalizeRoom(data);
+  },
+
+  async setRoomMovies(roomCode: string, movies: Movie[]): Promise<Room> {
+    const data = await request<any>(
+      `/rooms/${encodeURIComponent(roomCode)}/movies`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ movies: serializeMovies(movies) }),
+      },
+    );
     return normalizeRoom(data);
   },
 
@@ -306,6 +321,7 @@ export const api = {
 
 export interface FilterOptions {
   genres?: number[]; // TMDB genre IDs
+  providers?: number[]; // TMDB watch provider IDs
   year?: string; // Exact release year e.g. "2024"
   sort?: string; // TMDB sort_by value e.g. "popularity.desc"
 }
@@ -383,6 +399,11 @@ async function fetchTmdbMoviesWithFilters(
         params.set("with_genres", filters.genres.join(","));
       }
 
+      if (filters.providers?.length) {
+        params.set("with_watch_providers", filters.providers.join("|"));
+        params.set("with_watch_monetization_types", "flatrate");
+      }
+
       if (filters.year) {
         params.set("primary_release_year", filters.year);
       }
@@ -406,6 +427,10 @@ async function fetchBackendMoviesWithFilters(
 
   if (filters.genres?.length) {
     params.set("genres", filters.genres.join(","));
+  }
+
+  if (filters.providers?.length) {
+    params.set("providers", filters.providers.join(","));
   }
 
   if (filters.year) {

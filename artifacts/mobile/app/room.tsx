@@ -1,4 +1,6 @@
+import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
+import * as Linking from "expo-linking";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -19,7 +21,12 @@ import { Feather } from "@expo/vector-icons";
 import { Movie, MovieCard, MovieCardRef } from "@/components/MovieCard";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
-import { api, fetchMoviesWithFilters, FilterOptions, Room } from "@/services/api";
+import {
+  api,
+  fetchMoviesWithFilters,
+  FilterOptions,
+  Room,
+} from "@/services/api";
 import { connectRoomRealtime } from "@/services/roomRealtime";
 
 // ─── Genre list (TMDB IDs) ─────────────────────────────────────────────────
@@ -38,6 +45,21 @@ const GENRES = [
   { id: 878,   label: "Sci-Fi" },
   { id: 53,    label: "Thriller" },
   { id: 37,    label: "Western" },
+];
+
+// TMDB watch provider IDs for the US region.
+const STREAMING_PROVIDERS = [
+  { id: 8, label: "Netflix" },
+  { id: 9, label: "Prime Video" },
+  { id: 337, label: "Disney+" },
+  { id: 15, label: "Hulu" },
+  { id: 1899, label: "Max" },
+  { id: 350, label: "Apple TV+" },
+  { id: 531, label: "Paramount+" },
+  { id: 386, label: "Peacock" },
+  { id: 283, label: "Crunchyroll" },
+  { id: 257, label: "fuboTV" },
+  { id: 43, label: "Starz" },
 ];
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -78,13 +100,16 @@ export default function RoomScreen() {
 
   // Filter state
   const [selectedGenres, setSelectedGenres] = useState<number[]>([]);
+  const [selectedProviders, setSelectedProviders] = useState<number[]>([]);
   const [selectedYear, setSelectedYear] = useState("");
   const [selectedSort, setSelectedSort] = useState("popularity.desc");
   const [startingGame, setStartingGame] = useState(false);
+  const [copiedInvite, setCopiedInvite] = useState(false);
 
   const cardRef = useRef<MovieCardRef>(null);
   const swiping = useRef(false);
   const navigatingToMatch = useRef(false);
+  const didInit = useRef(false);
   const stageRef = useRef<Stage>("loading");
   const moviesRef = useRef<Movie[]>([]);
 
@@ -125,7 +150,11 @@ export default function RoomScreen() {
   );
 
   // ── Initialize on mount ─────────────────────────────────────────────────
-  useEffect(() => { initRoom(); }, []);
+  useEffect(() => {
+    if (didInit.current) return;
+    didInit.current = true;
+    initRoom();
+  }, []);
 
   // ── Realtime participants & match updates ────────────────────────────────
   useEffect(() => {
@@ -170,8 +199,16 @@ export default function RoomScreen() {
   const initRoom = async () => {
     setError("");
     if (action === "create") {
-      // Go straight to config — room is created only when host presses "Start Swiping"
-      setStage("config");
+      setStage("loading");
+      setLoadingLabel("Creating room…");
+      try {
+        const createdRoom = await api.createRoom();
+        setRoom(createdRoom);
+        setParticipantCount(createdRoom.participants.length || 1);
+        setStage("config");
+      } catch (e: any) {
+        setError(e.message || "Failed to create room");
+      }
     } else {
       // Join existing room
       setStage("loading");
@@ -180,7 +217,7 @@ export default function RoomScreen() {
         const joined = await api.joinRoom(codeParam ?? "");
         setRoom(joined);
         setParticipantCount(joined.participants.length || 1);
-        if (joined.movies.length > 1) {
+        if (joined.movies.length > 0) {
           setMovies(joined.movies);
           setCurrentIndex(0);
           setStage("swiping");
@@ -202,6 +239,7 @@ export default function RoomScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       const filters: FilterOptions = {
         genres: selectedGenres.length ? selectedGenres : undefined,
+        providers: selectedProviders.length ? selectedProviders : undefined,
         year: selectedYear || undefined,
         sort: selectedSort,
       };
@@ -210,10 +248,12 @@ export default function RoomScreen() {
         throw new Error("No movies found for these filters. Try a different year or genre.");
       }
 
-      const createdRoom = await api.createRoom(fetched);
-      setRoom(createdRoom);
-      setMovies(fetched);
-      setParticipantCount(createdRoom.participants.length || 1);
+      const readyRoom = room
+        ? await api.setRoomMovies(room.code, fetched)
+        : await api.createRoom(fetched);
+      setRoom(readyRoom);
+      setMovies(readyRoom.movies.length > 0 ? readyRoom.movies : fetched);
+      setParticipantCount(readyRoom.participants.length || 1);
       setCurrentIndex(0);
       setStage("swiping");
     } catch (e: any) {
@@ -236,23 +276,24 @@ export default function RoomScreen() {
         direction === "like" ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light
       );
 
-      try {
-        const result = await api.createSwipe({ roomCode: room.code, movie, liked: direction === "like" });
-        if (result.match) {
-          showMatch(result.match);
-          swiping.current = false;
-          return true;
-        }
-      } catch (e: any) {
-        setError(e.message || "Failed to save swipe. Try again.");
-        swiping.current = false;
-        return false;
-      }
-
       const next = currentIndex + 1;
       if (next >= movies.length) setStage("finished");
       else setCurrentIndex(next);
       swiping.current = false;
+
+      api
+        .createSwipe({
+          roomCode: room.code,
+          movie,
+          liked: direction === "like",
+        })
+        .then((result) => {
+          if (result.match) showMatch(result.match);
+        })
+        .catch((e: any) => {
+          setError(e.message || "Failed to save swipe. Try again.");
+        });
+
       return true;
     },
     [currentIndex, movies, stage, room, showMatch]
@@ -266,6 +307,20 @@ export default function RoomScreen() {
   const currentMovie = movies[currentIndex];
   const nextMovie = movies[currentIndex + 1];
   const roomCode = room?.code ?? codeParam ?? "";
+  const inviteLink = roomCode
+    ? Linking.createURL("room", {
+        queryParams: { action: "join", code: roomCode },
+      })
+    : "";
+
+  const copyInviteLink = async () => {
+    if (!inviteLink) return;
+
+    await Clipboard.setStringAsync(inviteLink);
+    setCopiedInvite(true);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setTimeout(() => setCopiedInvite(false), 1800);
+  };
 
   useEffect(() => {
     movies
@@ -281,6 +336,14 @@ export default function RoomScreen() {
   const toggleGenre = (id: number) => {
     setSelectedGenres((prev) =>
       prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]
+    );
+  };
+
+  const toggleProvider = (id: number) => {
+    setSelectedProviders((prev) =>
+      prev.includes(id)
+        ? prev.filter((providerId) => providerId !== id)
+        : [...prev, id],
     );
   };
 
@@ -350,12 +413,49 @@ export default function RoomScreen() {
         >
           {/* Share code banner */}
           <View style={styles.codeBanner}>
-            <Feather name="share-2" size={16} color={colors.accent} />
-            <Text style={[styles.codeBannerText, { color: colors.mutedForeground }]}>
-              {roomCode
-                ? <>Share code{" "}<Text style={{ color: colors.accent, fontFamily: "Poppins_800ExtraBold" }}>{roomCode}</Text>{" "}with your friend</>
-                : "Your room code appears after you start"}
-            </Text>
+            <View style={styles.codeBannerIcon}>
+              <Feather name="share-2" size={18} color={colors.accent} />
+            </View>
+            <View style={styles.codeBannerCopy}>
+              <Text
+                style={[
+                  styles.codeBannerLabel,
+                  { color: colors.mutedForeground },
+                ]}
+              >
+                Invite your friends while you choose filters
+              </Text>
+              <Text style={styles.codeBannerCode}>
+                {roomCode || "Creating code…"}
+              </Text>
+            </View>
+            <Pressable
+              onPress={copyInviteLink}
+              disabled={!roomCode}
+              style={({ pressed }) => [
+                styles.copyLinkButton,
+                {
+                  opacity: !roomCode ? 0.45 : pressed ? 0.75 : 1,
+                  borderColor: copiedInvite
+                    ? "rgba(74,222,128,0.55)"
+                    : "rgba(255,214,0,0.35)",
+                },
+              ]}
+            >
+              <Feather
+                name={copiedInvite ? "check" : "copy"}
+                size={15}
+                color={copiedInvite ? "#4ADE80" : colors.accent}
+              />
+              <Text
+                style={[
+                  styles.copyLinkText,
+                  { color: copiedInvite ? "#4ADE80" : colors.accent },
+                ]}
+              >
+                {copiedInvite ? "Copied" : "Copy link"}
+              </Text>
+            </Pressable>
           </View>
 
           {/* Section: Genres */}
@@ -380,6 +480,46 @@ export default function RoomScreen() {
                 >
                   <Text style={[styles.chipText, active && styles.chipTextActive]}>
                     {g.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* Section: Streaming */}
+          <Text
+            style={[
+              styles.sectionLabel,
+              { color: colors.mutedForeground, marginTop: 24 },
+            ]}
+          >
+            STREAMING
+          </Text>
+          <Text
+            style={[
+              styles.sectionHint,
+              { color: "rgba(255,255,255,0.3)" },
+            ]}
+          >
+            Leave blank for any streaming provider
+          </Text>
+          <View style={styles.chipRow}>
+            {STREAMING_PROVIDERS.map((provider) => {
+              const active = selectedProviders.includes(provider.id);
+              return (
+                <Pressable
+                  key={provider.id}
+                  onPress={() => toggleProvider(provider.id)}
+                  style={({ pressed }) => [
+                    styles.chip,
+                    active && styles.chipActive,
+                    { opacity: pressed ? 0.75 : 1 },
+                  ]}
+                >
+                  <Text
+                    style={[styles.chipText, active && styles.chipTextActive]}
+                  >
+                    {provider.label}
                   </Text>
                 </Pressable>
               );
@@ -655,16 +795,49 @@ const styles = StyleSheet.create({
   codeBanner: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 12,
     backgroundColor: "rgba(255,214,0,0.08)",
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: "rgba(255,214,0,0.2)",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    padding: 14,
     marginBottom: 28,
   },
-  codeBannerText: { fontSize: 14, fontFamily: "Inter_400Regular" },
+  codeBannerIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,214,0,0.12)",
+  },
+  codeBannerCopy: { flex: 1, gap: 3 },
+  codeBannerLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 17,
+  },
+  codeBannerCode: {
+    color: "#FFD600",
+    fontSize: 24,
+    fontFamily: "Poppins_800ExtraBold",
+    letterSpacing: 3,
+  },
+  copyLinkButton: {
+    minHeight: 38,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    backgroundColor: "rgba(0,0,0,0.18)",
+  },
+  copyLinkText: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+  },
 
   sectionLabel: {
     fontSize: 11,

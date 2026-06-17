@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/splash.png",
-      "resizeMode": "cover",
+      "resizeMode": "contain",
       "backgroundColor": "#0E051A"
     },
     "ios": {
@@ -43,11 +43,11 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/splash.png",
-          "resizeMode": "cover",
+          "resizeMode": "contain",
           "backgroundColor": "#0E051A",
           "android": {
             "image": "./assets/images/filmera-logo.png",
-            "imageWidth": 260,
+            "imageWidth": 220,
             "resizeMode": "contain",
             "backgroundColor": "#0E051A"
           }

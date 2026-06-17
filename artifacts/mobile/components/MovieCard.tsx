@@ -25,7 +25,7 @@ export type { Movie };
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const SWIPE_THRESHOLD = 100;
-const SWIPE_OUT_DURATION = 250;
+const SWIPE_OUT_DURATION = 170;
 
 export interface MovieCardRef {
   swipeLeft: () => void;
@@ -44,6 +44,7 @@ export const MovieCard = forwardRef<MovieCardRef, MovieCardProps>(
   ({ movie, onSwipeLeft, onSwipeRight, isTop, stackIndex = 0 }, ref) => {
     const colors = useColors();
     const position = useRef(new Animated.ValueXY()).current;
+    const isAnimating = useRef(false);
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
     const gradientPair = CARD_GRADIENTS[movie.id % CARD_GRADIENTS.length];
     const description = movie.genre ?? movie.overview ?? "";
@@ -58,6 +59,9 @@ export const MovieCard = forwardRef<MovieCardRef, MovieCardProps>(
 
     const forceSwipe = useCallback(
       (direction: "right" | "left") => {
+        if (isAnimating.current) return;
+        isAnimating.current = true;
+
         const x =
           direction === "right" ? SCREEN_WIDTH * 1.5 : -SCREEN_WIDTH * 1.5;
         Animated.timing(position, {
@@ -71,6 +75,7 @@ export const MovieCard = forwardRef<MovieCardRef, MovieCardProps>(
               : await onSwipeLeft();
 
           if (!didSave) resetPosition();
+          isAnimating.current = false;
         });
       },
       [position, onSwipeLeft, onSwipeRight, resetPosition]
