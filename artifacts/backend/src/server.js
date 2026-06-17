@@ -659,8 +659,6 @@ function createRouter() {
       const movies = Array.isArray(req.body?.movies)
         ? req.body.movies.map(normalizeMovie)
         : [];
-      if (movies.length === 0)
-        return res.status(400).json({ message: "Movies are required" });
 
       let code = String(req.body?.code || "")
         .trim()
@@ -693,6 +691,47 @@ function createRouter() {
       return next(error);
     }
   });
+
+  router.patch(
+    "/rooms/:roomCode/movies",
+    requireUser,
+    async (req, res, next) => {
+      try {
+        const movies = Array.isArray(req.body?.movies)
+          ? req.body.movies.map(normalizeMovie)
+          : [];
+        if (movies.length === 0)
+          return res.status(400).json({ message: "Movies are required" });
+
+        const room = await findRoomByCode(req.params.roomCode);
+        if (!room) return res.status(404).json({ message: "Room not found" });
+
+        const participants = (room.participants || []).map(String);
+        if (!participants.includes(String(req.user._id))) {
+          return res.status(403).json({
+            message: "Join the room before updating movies",
+          });
+        }
+
+        room.movies = movies;
+        room.matchedMovie = null;
+
+        if (mongoReady) {
+          await Swipe.deleteMany({ roomCode: room.code });
+        } else {
+          memory.swipes = memory.swipes.filter(
+            (swipe) => swipe.roomCode !== room.code,
+          );
+        }
+
+        await saveRoom(room);
+        broadcastRoom(room);
+        return res.json({ room: publicRoom(room) });
+      } catch (error) {
+        return next(error);
+      }
+    },
+  );
 
   router.post("/rooms/:roomCode/join", requireUser, async (req, res, next) => {
     try {
