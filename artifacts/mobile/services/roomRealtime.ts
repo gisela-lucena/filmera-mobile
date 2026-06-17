@@ -97,7 +97,8 @@ export function connectRoomRealtime({
     };
     socket.onmessage = handleMessage;
     socket.onerror = () => {
-      onError?.("Realtime connection failed.");
+      // Native platforms can emit transient WebSocket errors while the app is
+      // backgrounded or resuming. The close handler below reconnects silently.
     };
     socket.onclose = scheduleReconnect;
   }
