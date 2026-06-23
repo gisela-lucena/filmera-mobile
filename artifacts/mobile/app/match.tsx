@@ -7,8 +7,10 @@ import {
   Animated,
   Dimensions,
   Image,
+  Linking,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -17,7 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 
 import { useColors } from "@/hooks/useColors";
-import { api } from "@/services/api";
+import { api, fetchMovieWatchProviders, WatchProvider } from "@/services/api";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const PARTICLE_COUNT = 22;
@@ -47,6 +49,48 @@ function useParticles(): Particle[] {
   ).current;
 }
 
+function getProviderLink(
+  providerName: string,
+  movieTitle: string,
+  fallbackLink: string,
+): string {
+  const query = encodeURIComponent(movieTitle);
+  const normalizedName = providerName.toLowerCase();
+
+  if (normalizedName.includes("netflix")) {
+    return `https://www.netflix.com/search?q=${query}`;
+  }
+  if (normalizedName.includes("prime")) {
+    return `https://www.primevideo.com/search/ref=atv_nb_sr?phrase=${query}`;
+  }
+  if (normalizedName.includes("disney")) {
+    return `https://www.disneyplus.com/search?q=${query}`;
+  }
+  if (normalizedName.includes("hulu")) {
+    return `https://www.hulu.com/search?q=${query}`;
+  }
+  if (normalizedName.includes("max")) {
+    return `https://www.max.com/search?q=${query}`;
+  }
+  if (normalizedName.includes("apple")) {
+    return `https://tv.apple.com/search?term=${query}`;
+  }
+  if (normalizedName.includes("paramount")) {
+    return `https://www.paramountplus.com/search/?query=${query}`;
+  }
+  if (normalizedName.includes("peacock")) {
+    return `https://www.peacocktv.com/search?q=${query}`;
+  }
+  if (normalizedName.includes("crunchyroll")) {
+    return `https://www.crunchyroll.com/search?q=${query}`;
+  }
+  if (normalizedName.includes("starz")) {
+    return `https://www.starz.com/us/en/search?q=${query}`;
+  }
+
+  return fallbackLink;
+}
+
 export default function MatchScreen() {
   const colors = useColors();
   const router = useRouter();
@@ -57,12 +101,17 @@ export default function MatchScreen() {
     movieYear: string;
     movieGenre: string;
     movieRating: string;
+    movieId: string;
     partnerName: string;
     myName: string;
     roomCode: string;
   }>();
   const [clearingMatch, setClearingMatch] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [providerError, setProviderError] = useState("");
+  const [providers, setProviders] = useState<WatchProvider[]>([]);
+  const [providersLoading, setProvidersLoading] = useState(false);
+  const [showProviders, setShowProviders] = useState(false);
 
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -71,6 +120,36 @@ export default function MatchScreen() {
 
   const topPad = Platform.OS === "web" ? Math.max(insets.top, 67) : insets.top;
   const bottomPad = Platform.OS === "web" ? Math.max(insets.bottom, 34) : insets.bottom;
+
+  const loadProviders = async () => {
+    if (providersLoading) return;
+
+    if (showProviders) {
+      setShowProviders(false);
+      return;
+    }
+
+    setShowProviders(true);
+    if (providers.length > 0) return;
+
+    try {
+      setProvidersLoading(true);
+      setProviderError("");
+      const movieId = Number(params.movieId);
+      if (!Number.isFinite(movieId)) {
+        throw new Error("Could not identify this movie.");
+      }
+      const availableProviders = await fetchMovieWatchProviders(movieId);
+      setProviders(availableProviders);
+      if (availableProviders.length === 0) {
+        setProviderError("No streaming providers found for this movie.");
+      }
+    } catch (error: any) {
+      setProviderError(error.message || "Could not load watch providers.");
+    } finally {
+      setProvidersLoading(false);
+    }
+  };
 
   useEffect(() => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -141,7 +220,13 @@ export default function MatchScreen() {
         />
       ))}
 
-      <View style={[styles.content, { paddingTop: topPad + 16, paddingBottom: bottomPad + 24 }]}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: topPad + 16, paddingBottom: bottomPad + 24 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Match badge */}
         <Animated.View style={[styles.matchBadge, { transform: [{ scale: titleAnim }] }]}>
           <Text style={styles.matchEmoji}>🎉</Text>
@@ -184,7 +269,9 @@ export default function MatchScreen() {
             {params.movieYear} · {params.movieGenre}
           </Text>
           <View style={styles.ratingRow}>
-            <Text style={[styles.ratingStar, { color: colors.accent }]}>★</Text>
+            <Text style={[styles.ratingSource, { color: colors.accent }]}>
+              TMDB
+            </Text>
             <Text style={[styles.ratingVal, { color: colors.accent }]}>
               {params.movieRating}
             </Text>
@@ -193,6 +280,93 @@ export default function MatchScreen() {
 
         {/* Actions */}
         <Animated.View style={[styles.actions, { opacity: fadeAnim }]}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.keepBtn,
+              {
+                backgroundColor: "rgba(255,255,255,0.08)",
+                borderColor: "rgba(255,214,0,0.35)",
+                opacity: pressed || providersLoading ? 0.75 : 1,
+              },
+            ]}
+            onPress={loadProviders}
+            disabled={providersLoading}
+          >
+            {providersLoading ? (
+              <ActivityIndicator color={colors.accent} />
+            ) : (
+              <>
+                <Feather name="play-circle" size={17} color={colors.accent} />
+                <Text style={[styles.keepBtnText, { color: colors.accent }]}>
+                  Where to Watch
+                </Text>
+              </>
+            )}
+          </Pressable>
+
+          {showProviders ? (
+            <View style={styles.providersCard}>
+              {providers.map((provider) => (
+                <Pressable
+                  key={provider.id}
+                  style={({ pressed }) => [
+                    styles.providerRow,
+                    { opacity: pressed ? 0.75 : 1 },
+                  ]}
+                  onPress={() =>
+                    Linking.openURL(
+                      getProviderLink(
+                        provider.name,
+                        params.movieTitle,
+                        provider.link,
+                      ),
+                    )
+                  }
+                >
+                  {provider.logo ? (
+                    <Image
+                      source={{ uri: provider.logo }}
+                      style={styles.providerLogo}
+                    />
+                  ) : (
+                    <View style={styles.providerLogoFallback}>
+                      <Feather
+                        name="tv"
+                        size={16}
+                        color={colors.mutedForeground}
+                      />
+                    </View>
+                  )}
+                  <Text
+                    style={[
+                      styles.providerName,
+                      { color: colors.foreground },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {provider.name}
+                  </Text>
+                  <Feather
+                    name="external-link"
+                    size={15}
+                    color={colors.mutedForeground}
+                  />
+                </Pressable>
+              ))}
+
+              {providerError ? (
+                <Text
+                  style={[
+                    styles.providerError,
+                    { color: colors.mutedForeground },
+                  ]}
+                >
+                  {providerError}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+
           <Pressable
             disabled={clearingMatch}
             style={({ pressed }) => [
@@ -258,7 +432,7 @@ export default function MatchScreen() {
             </Text>
           </Pressable>
         </Animated.View>
-      </View>
+      </ScrollView>
     </View>
   );
 }
@@ -283,7 +457,7 @@ const styles = StyleSheet.create({
     marginTop: -5,
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 24,
@@ -346,9 +520,48 @@ const styles = StyleSheet.create({
   },
   movieMeta: { fontSize: 13, fontFamily: "Inter_500Medium" },
   ratingRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  ratingStar: { fontSize: 16 },
+  ratingSource: { fontSize: 12, fontFamily: "Inter_700Bold" },
   ratingVal: { fontSize: 15, fontFamily: "Inter_700Bold" },
   actions: { width: "100%", gap: 12 },
+  providersCard: {
+    gap: 8,
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  providerRow: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 8,
+  },
+  providerLogo: {
+    width: 32,
+    height: 32,
+    borderRadius: 7,
+  },
+  providerLogoFallback: {
+    width: 32,
+    height: 32,
+    borderRadius: 7,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  providerName: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+  },
+  providerError: {
+    paddingVertical: 6,
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    textAlign: "center",
+  },
   watchBtn: {
     height: 54,
     borderRadius: 14,

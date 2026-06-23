@@ -139,6 +139,7 @@ export default function RoomScreen() {
             movieYear: movie.year,
             movieGenre: movie.genre ?? "",
             movieRating: movie.rating,
+            movieId: String(movie.tmdbId ?? movie.id),
             partnerName: "your partner",
             myName: user?.name ?? "You",
             roomCode: room?.code ?? codeParam ?? "",

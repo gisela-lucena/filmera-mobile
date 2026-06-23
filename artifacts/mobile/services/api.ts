@@ -120,13 +120,41 @@ export interface Room {
   matchedMovie?: Movie | null;
 }
 
+export interface WatchProvider {
+  id: number;
+  name: string;
+  logo: string;
+  link: string;
+  priority?: number;
+}
+
+export interface MovieCredits {
+  director: string;
+  cast: string[];
+}
+
+function normalizeRating(value: any): string {
+  if (typeof value === "string" && value.includes("%")) return value;
+
+  const rating = Number(value);
+  if (!Number.isFinite(rating) || rating <= 0) return "";
+
+  return `${Math.round(rating * 10)}%`;
+}
+
+function ratingSortValue(rating: string): number {
+  const value = Number(String(rating).replace("%", ""));
+  if (!Number.isFinite(value)) return 0;
+  return String(rating).includes("%") ? value : value * 10;
+}
+
 export function normalizeMovies(movies: any[]): Movie[] {
   return (movies ?? []).map((m) => ({
     id: m.tmdbId ?? m.id,
     tmdbId: m.tmdbId ?? m.id,
     title: m.title,
     year: String(m.year ?? ""),
-    rating: String(m.rating ?? ""),
+    rating: normalizeRating(m.rating),
     overview: m.overview ?? "",
     poster: m.poster ?? "",
   }));
@@ -354,7 +382,7 @@ function normalizeTmdbMovie(movie: any): Movie {
     tmdbId: movie.id as number,
     title: movie.title as string,
     year: (movie.release_date as string)?.slice(0, 4) ?? "",
-    rating: String((movie.vote_average as number)?.toFixed(1) ?? ""),
+    rating: normalizeRating(movie.vote_average),
     overview: (movie.overview as string) ?? "",
     poster: movie.poster_path
       ? `https://image.tmdb.org/t/p/w500${movie.poster_path as string}`
@@ -366,7 +394,9 @@ function sortMovies(movies: Movie[], sort = "popularity.desc"): Movie[] {
   const sorted = [...movies];
 
   if (sort === "vote_average.desc") {
-    return sorted.sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0));
+    return sorted.sort(
+      (a, b) => ratingSortValue(b.rating) - ratingSortValue(a.rating),
+    );
   }
 
   if (sort === "release_date.desc") {
@@ -461,4 +491,60 @@ export async function fetchMoviesWithFilters(
 
 export async function fetch100TmdbMovies(): Promise<Movie[]> {
   return fetchMoviesWithFilters({});
+}
+
+export async function fetchMovieWatchProviders(
+  movieId: number,
+): Promise<WatchProvider[]> {
+  const tmdbToken = getTmdbToken();
+  if (!tmdbToken) return [];
+
+  const data = await tmdbFetch<any>(
+    `/movie/${movieId}/watch/providers`,
+    tmdbToken,
+  );
+  const region = data?.results?.[WATCH_REGION];
+  const providers = [
+    ...(region?.flatrate ?? []),
+    ...(region?.free ?? []),
+    ...(region?.ads ?? []),
+    ...(region?.rent ?? []),
+    ...(region?.buy ?? []),
+  ];
+
+  const uniqueProviders = new Map<number, WatchProvider>();
+  for (const provider of providers) {
+    const id = Number(provider.provider_id);
+    if (!Number.isFinite(id) || uniqueProviders.has(id)) continue;
+
+    uniqueProviders.set(id, {
+      id,
+      name: String(provider.provider_name ?? ""),
+      logo: provider.logo_path
+        ? `https://image.tmdb.org/t/p/w92${provider.logo_path as string}`
+        : "",
+      link: String(region?.link ?? "https://www.themoviedb.org/"),
+      priority: Number(provider.display_priority ?? 999),
+    });
+  }
+
+  return Array.from(uniqueProviders.values())
+    .sort((a, b) => (a.priority ?? 999) - (b.priority ?? 999))
+    .slice(0, 5);
+}
+
+export async function fetchMovieCredits(movieId: number): Promise<MovieCredits> {
+  const tmdbToken = getTmdbToken();
+  if (!tmdbToken) return { director: "", cast: [] };
+
+  const data = await tmdbFetch<any>(`/movie/${movieId}/credits`, tmdbToken);
+  const director =
+    ((data?.crew ?? []) as any[]).find((person) => person?.job === "Director")
+      ?.name ?? "";
+  const cast = ((data?.cast ?? []) as any[])
+    .slice(0, 5)
+    .map((person) => String(person?.name ?? ""))
+    .filter(Boolean);
+
+  return { director, cast };
 }

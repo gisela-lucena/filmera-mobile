@@ -16,10 +16,11 @@ import {
   Text,
   View,
 } from "react-native";
+import { Feather } from "@expo/vector-icons";
 
 import { CARD_GRADIENTS } from "@/constants/colors";
 import { useColors } from "@/hooks/useColors";
-import { Movie } from "@/services/api";
+import { fetchMovieCredits, Movie, MovieCredits } from "@/services/api";
 
 export type { Movie };
 
@@ -46,8 +47,39 @@ export const MovieCard = forwardRef<MovieCardRef, MovieCardProps>(
     const position = useRef(new Animated.ValueXY()).current;
     const isAnimating = useRef(false);
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+    const [credits, setCredits] = useState<MovieCredits | null>(null);
+    const [creditsError, setCreditsError] = useState("");
+    const [creditsLoading, setCreditsLoading] = useState(false);
+    const [showCredits, setShowCredits] = useState(false);
     const gradientPair = CARD_GRADIENTS[movie.id % CARD_GRADIENTS.length];
     const description = movie.genre ?? movie.overview ?? "";
+
+    const loadCredits = useCallback(async () => {
+      if (!isTop) return;
+
+      if (showCredits) {
+        setShowCredits(false);
+        return;
+      }
+
+      setShowCredits(true);
+      if (credits || creditsLoading) return;
+
+      try {
+        setCreditsLoading(true);
+        setCreditsError("");
+        const movieId = movie.tmdbId ?? movie.id;
+        const movieCredits = await fetchMovieCredits(movieId);
+        setCredits(movieCredits);
+        if (!movieCredits.director && movieCredits.cast.length === 0) {
+          setCreditsError("Credits are not available for this movie.");
+        }
+      } catch (error: any) {
+        setCreditsError(error.message || "Could not load credits.");
+      } finally {
+        setCreditsLoading(false);
+      }
+    }, [credits, creditsLoading, isTop, movie.id, movie.tmdbId, showCredits]);
 
     const resetPosition = useCallback(() => {
       Animated.spring(position, {
@@ -163,6 +195,18 @@ export const MovieCard = forwardRef<MovieCardRef, MovieCardProps>(
         {/* Like / Pass stamps */}
         {isTop && (
           <>
+            <Pressable
+              onPress={loadCredits}
+              style={({ pressed }) => [
+                styles.infoButton,
+                { opacity: pressed ? 0.75 : 1 },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Show movie cast and director"
+            >
+              <Feather name="info" size={20} color="#FDFBEF" />
+            </Pressable>
+
             <Animated.View
               style={[styles.stamp, styles.likeStamp, { opacity: likeOpacity }]}
             >
@@ -180,10 +224,46 @@ export const MovieCard = forwardRef<MovieCardRef, MovieCardProps>(
           </>
         )}
 
+        {isTop && showCredits ? (
+          <View style={styles.creditsPanel}>
+            <View style={styles.creditsHeader}>
+              <Text style={styles.creditsTitle}>Movie Info</Text>
+              <Pressable
+                onPress={() => setShowCredits(false)}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Close movie info"
+              >
+                <Feather name="x" size={18} color="#FDFBEF" />
+              </Pressable>
+            </View>
+
+            {creditsLoading ? (
+              <Text style={styles.creditsText}>Loading cast...</Text>
+            ) : creditsError ? (
+              <Text style={styles.creditsText}>{creditsError}</Text>
+            ) : (
+              <>
+                <Text style={styles.creditsLabel}>Director</Text>
+                <Text style={styles.creditsText}>
+                  {credits?.director || "Not available"}
+                </Text>
+
+                <Text style={styles.creditsLabel}>Cast</Text>
+                <Text style={styles.creditsText}>
+                  {credits?.cast.length
+                    ? credits.cast.join(", ")
+                    : "Not available"}
+                </Text>
+              </>
+            )}
+          </View>
+        ) : null}
+
         {/* Movie info */}
         <View style={styles.info}>
           <View style={styles.metaRow}>
-            <Text style={styles.starIcon}>★</Text>
+            <Text style={styles.ratingSource}>TMDB</Text>
             <Text style={styles.rating}>{movie.rating}</Text>
             <Text style={styles.year}>{movie.year}</Text>
           </View>
@@ -242,6 +322,58 @@ const styles = StyleSheet.create({
     bottom: 0,
     height: "55%",
   },
+  infoButton: {
+    position: "absolute",
+    top: 18,
+    right: 18,
+    zIndex: 4,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
+  creditsPanel: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    top: 72,
+    zIndex: 5,
+    padding: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
+    backgroundColor: "rgba(14,5,26,0.92)",
+  },
+  creditsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  creditsTitle: {
+    color: "#FDFBEF",
+    fontSize: 16,
+    fontFamily: "Poppins_800ExtraBold",
+  },
+  creditsLabel: {
+    marginTop: 8,
+    color: "#FFD600",
+    fontSize: 11,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  creditsText: {
+    marginTop: 3,
+    color: "rgba(255,255,255,0.84)",
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+    lineHeight: 20,
+  },
   info: {
     position: "absolute",
     bottom: 0,
@@ -256,8 +388,9 @@ const styles = StyleSheet.create({
     gap: 6,
     marginBottom: 4,
   },
-  starIcon: {
-    fontSize: 13,
+  ratingSource: {
+    fontSize: 11,
+    fontFamily: "Inter_700Bold",
     color: "#FFD600",
   },
   rating: {
