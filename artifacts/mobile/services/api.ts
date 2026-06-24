@@ -1,4 +1,5 @@
 import Constants from "expo-constants";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 
 // Provide a minimal "process.env" typing for environments without @types/node
@@ -32,6 +33,8 @@ const g = globalThis as typeof globalThis & {
   _filmeraToken?: string | null;
   _filmeraWarmup?: Promise<void>;
 };
+const LOCAL_FAVORITES_KEY = "filmera:favorites";
+export const MAX_FAVORITE_MOVIES = 200;
 
 export function getToken(): string | null {
   return g._filmeraToken ?? null;
@@ -131,6 +134,7 @@ export interface WatchProvider {
 export interface MovieCredits {
   director: string;
   cast: string[];
+  certification: string;
 }
 
 function normalizeRating(value: any): string {
@@ -180,6 +184,34 @@ function serializeMovies(movies: Movie[]) {
     overview: m.overview,
     poster: m.poster,
   }));
+}
+
+function shouldUseLocalFavoritesFallback(error: any): boolean {
+  const message = String(error?.message ?? "");
+  return (
+    message.includes("received 404") ||
+    message.includes("Error 404") ||
+    message.includes("Cannot GET") ||
+    message.includes("Cannot POST") ||
+    message.includes("Cannot DELETE")
+  );
+}
+
+async function getLocalFavorites(): Promise<Movie[]> {
+  const raw = await AsyncStorage.getItem(LOCAL_FAVORITES_KEY);
+  if (!raw) return [];
+
+  try {
+    return normalizeMovies(JSON.parse(raw));
+  } catch {
+    return [];
+  }
+}
+
+async function setLocalFavorites(favorites: Movie[]): Promise<Movie[]> {
+  const normalized = normalizeMovies(favorites).slice(0, MAX_FAVORITE_MOVIES);
+  await AsyncStorage.setItem(LOCAL_FAVORITES_KEY, JSON.stringify(normalized));
+  return normalized;
 }
 
 function getExtraConfigValue(key: string): string {
@@ -281,6 +313,76 @@ export const api = {
     return request<{ message: string }>("/users/me", {
       method: "DELETE",
     });
+  },
+
+  async getFavorites(): Promise<Movie[]> {
+    try {
+      const data = await request<any>("/favorites");
+      const favorites = normalizeMovies(data?.favorites ?? data ?? []);
+      await setLocalFavorites(favorites);
+      return favorites;
+    } catch (error: any) {
+      if (shouldUseLocalFavoritesFallback(error)) {
+        return getLocalFavorites();
+      }
+      throw error;
+    }
+  },
+
+  async addFavorite(movie: Movie): Promise<Movie[]> {
+    try {
+      const data = await request<any>("/favorites", {
+        method: "POST",
+        body: JSON.stringify({ movie: serializeMovies([movie])[0] }),
+      });
+      const favorites = normalizeMovies(data?.favorites ?? data ?? []);
+      await setLocalFavorites(favorites);
+      return favorites;
+    } catch (error: any) {
+      if (!shouldUseLocalFavoritesFallback(error)) throw error;
+
+      const movieId = movie.tmdbId ?? movie.id;
+      const favorites = await getLocalFavorites();
+      const alreadyFavorite = favorites.some(
+        (favorite) => (favorite.tmdbId ?? favorite.id) === movieId,
+      );
+
+      if (!alreadyFavorite && favorites.length >= MAX_FAVORITE_MOVIES) {
+        throw new Error(
+          `You can save up to ${MAX_FAVORITE_MOVIES} favorite movies.`,
+        );
+      }
+
+      return setLocalFavorites([
+        movie,
+        ...favorites.filter(
+          (favorite) => (favorite.tmdbId ?? favorite.id) !== movieId,
+        ),
+      ]);
+    }
+  },
+
+  async removeFavorite(movieId: number): Promise<Movie[]> {
+    try {
+      const data = await request<any>(
+        `/favorites/${encodeURIComponent(movieId)}`,
+        {
+          method: "DELETE",
+        },
+      );
+      const favorites = normalizeMovies(data?.favorites ?? data ?? []);
+      await setLocalFavorites(favorites);
+      return favorites;
+    } catch (error: any) {
+      if (!shouldUseLocalFavoritesFallback(error)) throw error;
+
+      const favorites = await getLocalFavorites();
+      return setLocalFavorites(
+        favorites.filter(
+          (favorite) => (favorite.tmdbId ?? favorite.id) !== movieId,
+        ),
+      );
+    }
   },
 
   async createRoom(movies: Movie[] = []): Promise<Room> {
@@ -535,9 +637,12 @@ export async function fetchMovieWatchProviders(
 
 export async function fetchMovieCredits(movieId: number): Promise<MovieCredits> {
   const tmdbToken = getTmdbToken();
-  if (!tmdbToken) return { director: "", cast: [] };
+  if (!tmdbToken) return { director: "", cast: [], certification: "" };
 
-  const data = await tmdbFetch<any>(`/movie/${movieId}/credits`, tmdbToken);
+  const [data, releaseDates] = await Promise.all([
+    tmdbFetch<any>(`/movie/${movieId}/credits`, tmdbToken),
+    tmdbFetch<any>(`/movie/${movieId}/release_dates`, tmdbToken),
+  ]);
   const director =
     ((data?.crew ?? []) as any[]).find((person) => person?.job === "Director")
       ?.name ?? "";
@@ -545,6 +650,13 @@ export async function fetchMovieCredits(movieId: number): Promise<MovieCredits> 
     .slice(0, 5)
     .map((person) => String(person?.name ?? ""))
     .filter(Boolean);
+  const regionRelease = ((releaseDates?.results ?? []) as any[]).find(
+    (result) => result?.iso_3166_1 === WATCH_REGION,
+  );
+  const certification =
+    ((regionRelease?.release_dates ?? []) as any[]).find((release) =>
+      Boolean(String(release?.certification ?? "").trim()),
+    )?.certification ?? "";
 
-  return { director, cast };
+  return { director, cast, certification };
 }

@@ -2,10 +2,11 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Linking,
   Platform,
   Pressable,
@@ -19,6 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useInfoToolTip } from "@/components/InfoToolTip";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import { api, MAX_FAVORITE_MOVIES, Movie } from "@/services/api";
 
 export default function AccountSettingsScreen() {
   const colors = useColors();
@@ -27,12 +29,44 @@ export default function AccountSettingsScreen() {
   const { user, isLoading, deleteAccount } = useAuth();
   const { showInfoTooltip } = useInfoToolTip();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [favorites, setFavorites] = useState<Movie[]>([]);
+  const [favoritesOpen, setFavoritesOpen] = useState(false);
+  const [favoritesLoaded, setFavoritesLoaded] = useState(false);
+  const [favoritesLoading, setFavoritesLoading] = useState(false);
+  const [favoritesEditing, setFavoritesEditing] = useState(false);
+  const [removingFavoriteId, setRemovingFavoriteId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!isLoading && !user) {
       router.replace("/");
     }
   }, [isLoading, router, user]);
+
+  const loadFavorites = useCallback(async () => {
+    setFavoritesLoading(true);
+    try {
+      const movies = await api.getFavorites();
+      setFavorites(movies);
+      setFavoritesLoaded(true);
+    } catch (error: any) {
+      showInfoTooltip("error", error.message || "Could not load favorites.");
+    } finally {
+      setFavoritesLoading(false);
+    }
+  }, [showInfoTooltip]);
+
+  const toggleFavoritesOpen = () => {
+    if (favoritesOpen) {
+      setFavoritesOpen(false);
+      setFavoritesEditing(false);
+      return;
+    }
+
+    setFavoritesOpen(true);
+    if (!favoritesLoaded) {
+      void loadFavorites();
+    }
+  };
 
   const removeAccount = async () => {
     try {
@@ -63,6 +97,42 @@ export default function AccountSettingsScreen() {
           text: "Delete Account",
           style: "destructive",
           onPress: removeAccount,
+        },
+      ],
+    );
+  };
+
+  const removeFavorite = async (movie: Movie) => {
+    const movieId = movie.tmdbId ?? movie.id;
+    if (!Number.isFinite(movieId)) return;
+
+    try {
+      setRemovingFavoriteId(movieId);
+      const updatedFavorites = await api.removeFavorite(movieId);
+      setFavorites(updatedFavorites);
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      showInfoTooltip("success", "Removed from favorites.");
+    } catch (error: any) {
+      showInfoTooltip(
+        "error",
+        error.message || "Could not remove this favorite.",
+      );
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
+      setRemovingFavoriteId(null);
+    }
+  };
+
+  const confirmRemoveFavorite = (movie: Movie) => {
+    Alert.alert(
+      "Remove favorite?",
+      `Remove "${movie.title}" from your watch later list?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: () => removeFavorite(movie),
         },
       ],
     );
@@ -120,6 +190,141 @@ export default function AccountSettingsScreen() {
               {user.email}
             </Text>
           </View>
+        </View>
+
+        <View style={styles.favoritesCard}>
+          <Pressable
+            onPress={toggleFavoritesOpen}
+            style={({ pressed }) => [
+              styles.favoritesSummary,
+              { opacity: pressed ? 0.72 : 1 },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Open favorites"
+          >
+            <View style={styles.sectionTitleRow}>
+              <View style={styles.policyIcon}>
+                <Feather name="star" size={20} color={colors.accent} />
+              </View>
+              <View>
+                <Text style={styles.policyTitle}>Favorites</Text>
+                <Text
+                  style={[
+                    styles.policyDescription,
+                    { color: colors.mutedForeground },
+                  ]}
+                >
+                  Tap to view movies saved to watch later.
+                </Text>
+              </View>
+            </View>
+            <Feather
+              name={favoritesOpen ? "chevron-up" : "chevron-down"}
+              size={21}
+              color={colors.mutedForeground}
+            />
+          </Pressable>
+
+          {favoritesOpen ? (
+            <>
+              <View style={styles.favoritesToolbar}>
+                <Text
+                  style={[
+                    styles.favoriteLimitText,
+                    { color: colors.mutedForeground },
+                  ]}
+                >
+                  {favorites.length}/{MAX_FAVORITE_MOVIES} saved
+                </Text>
+                {favorites.length > 0 ? (
+                  <Pressable
+                    onPress={() => setFavoritesEditing((editing) => !editing)}
+                    style={({ pressed }) => [
+                      styles.editButton,
+                      { opacity: pressed ? 0.7 : 1 },
+                    ]}
+                  >
+                    <Text style={styles.editButtonText}>
+                      {favoritesEditing ? "Done" : "Edit"}
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
+
+              {favoritesLoading ? (
+                <ActivityIndicator color={colors.accent} style={styles.favoritesLoader} />
+              ) : favorites.length === 0 ? (
+                <Text
+                  style={[
+                    styles.emptyFavoritesText,
+                    { color: colors.mutedForeground },
+                  ]}
+                >
+                  Tap the star on a movie card to save it here.
+                </Text>
+              ) : (
+                <View style={styles.favoritesList}>
+                  {favorites.map((movie) => {
+                    const movieId = movie.tmdbId ?? movie.id;
+                    const isRemoving = removingFavoriteId === movieId;
+
+                    return (
+                      <View key={`${movieId}-${movie.title}`} style={styles.favoriteItem}>
+                        {movie.poster ? (
+                          <Image
+                            source={{ uri: movie.poster }}
+                            style={styles.favoritePoster}
+                          />
+                        ) : (
+                          <View style={styles.favoritePosterFallback}>
+                            <Feather
+                              name="film"
+                              size={18}
+                              color={colors.mutedForeground}
+                            />
+                          </View>
+                        )}
+                        <View style={styles.favoriteCopy}>
+                          <Text style={styles.favoriteTitle} numberOfLines={1}>
+                            {movie.title}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.favoriteMeta,
+                              { color: colors.mutedForeground },
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {[movie.year, movie.rating ? `TMDB ${movie.rating}` : ""]
+                              .filter(Boolean)
+                              .join(" • ")}
+                          </Text>
+                        </View>
+                        {favoritesEditing ? (
+                          <Pressable
+                            onPress={() => confirmRemoveFavorite(movie)}
+                            disabled={isRemoving}
+                            style={({ pressed }) => [
+                              styles.removeFavoriteButton,
+                              { opacity: pressed || isRemoving ? 0.65 : 1 },
+                            ]}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Remove ${movie.title} from favorites`}
+                          >
+                            {isRemoving ? (
+                              <ActivityIndicator size="small" color="#F43F5E" />
+                            ) : (
+                              <Feather name="trash-2" size={18} color="#F43F5E" />
+                            )}
+                          </Pressable>
+                        ) : null}
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+            </>
+          ) : null}
         </View>
 
         <Pressable
@@ -300,6 +505,114 @@ const styles = StyleSheet.create({
     fontSize: 17,
   },
   email: { fontFamily: "Inter_400Regular", fontSize: 14 },
+  favoritesCard: {
+    gap: 16,
+    padding: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  favoritesSummary: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  sectionTitleRow: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  editButton: {
+    minHeight: 34,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,214,0,0.12)",
+  },
+  editButtonText: {
+    color: "#FFD600",
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+  },
+  favoritesToolbar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    paddingTop: 2,
+  },
+  favoriteLimitText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+    letterSpacing: 0.2,
+  },
+  favoritesLoader: {
+    alignSelf: "flex-start",
+    marginLeft: 4,
+  },
+  emptyFavoritesText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  favoritesList: {
+    gap: 12,
+  },
+  favoriteItem: {
+    minHeight: 78,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 10,
+    borderRadius: 16,
+    backgroundColor: "rgba(0,0,0,0.18)",
+  },
+  favoritePoster: {
+    width: 42,
+    height: 58,
+    borderRadius: 9,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  favoritePosterFallback: {
+    width: 42,
+    height: 58,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  favoriteCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  favoriteTitle: {
+    color: "#FDFBEF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+  },
+  favoriteMeta: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+  },
+  removeFavoriteButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(244,63,94,0.1)",
+  },
   policyButton: {
     height: 76,
     flexDirection: "row",

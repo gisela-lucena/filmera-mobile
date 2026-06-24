@@ -12,6 +12,7 @@ const PORT = Number(process.env.PORT || 3000);
 const JWT_SECRET = process.env.JWT_SECRET || "dev-filmera-secret-change-me";
 const MONGODB_URI = process.env.MONGODB_URI || "";
 const API_PREFIX = "/api/filmera";
+const MAX_FAVORITE_MOVIES = 200;
 const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000;
 const PASSWORD_RESET_URL =
   process.env.PASSWORD_RESET_URL || "filmera://reset-password";
@@ -104,6 +105,7 @@ const userSchema = new mongoose.Schema(
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     passwordHash: { type: String, required: true },
+    favoriteMovies: { type: [movieSchema], default: [] },
     passwordResetToken: { type: String, select: false },
     passwordResetExpires: { type: Date, select: false },
   },
@@ -161,6 +163,21 @@ function normalizeMovie(movie) {
     overview: movie.overview ?? "",
     poster: movie.poster ?? "",
   };
+}
+
+function normalizeFavoriteMovie(movie) {
+  const normalized = normalizeMovie(movie);
+  return {
+    ...normalized,
+    tmdbId: Number(normalized.tmdbId ?? normalized.id),
+    id: Number(normalized.tmdbId ?? normalized.id),
+  };
+}
+
+function publicFavorites(user) {
+  return (user.favoriteMovies || [])
+    .slice(0, MAX_FAVORITE_MOVIES)
+    .map(normalizeMovie);
 }
 
 function publicRoom(room) {
@@ -645,6 +662,99 @@ function createRouter() {
       }
 
       return res.json({ message: "Account deleted permanently" });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  router.get("/favorites", requireUser, (req, res) => {
+    return res.json({ favorites: publicFavorites(req.user) });
+  });
+
+  router.post("/favorites", requireUser, async (req, res, next) => {
+    try {
+      const movie = normalizeFavoriteMovie(req.body?.movie ?? req.body);
+      const movieId = Number(movie.tmdbId ?? movie.id);
+
+      if (!Number.isFinite(movieId)) {
+        return res.status(400).json({ message: "movieId is required" });
+      }
+      if (!movie.title) {
+        return res.status(400).json({ message: "Movie title is required" });
+      }
+
+      if (mongoReady) {
+        const currentUser = await User.findById(req.user._id);
+        const existingFavorites = currentUser.favoriteMovies || [];
+        const alreadyFavorite = existingFavorites.some(
+          (item) => Number(item.tmdbId ?? item.id) === movieId,
+        );
+
+        if (
+          !alreadyFavorite &&
+          existingFavorites.length >= MAX_FAVORITE_MOVIES
+        ) {
+          return res.status(400).json({
+            message: `You can save up to ${MAX_FAVORITE_MOVIES} favorite movies.`,
+          });
+        }
+
+        await User.updateOne(
+          { _id: req.user._id },
+          { $pull: { favoriteMovies: { tmdbId: movieId } } },
+        );
+        const updated = await User.findByIdAndUpdate(
+          req.user._id,
+          { $push: { favoriteMovies: { $each: [movie], $position: 0 } } },
+          { new: true },
+        );
+
+        return res.status(201).json({ favorites: publicFavorites(updated) });
+      }
+
+      const existingFavorites = req.user.favoriteMovies || [];
+      const alreadyFavorite = existingFavorites.some(
+        (item) => Number(item.tmdbId ?? item.id) === movieId,
+      );
+
+      if (!alreadyFavorite && existingFavorites.length >= MAX_FAVORITE_MOVIES) {
+        return res.status(400).json({
+          message: `You can save up to ${MAX_FAVORITE_MOVIES} favorite movies.`,
+        });
+      }
+
+      req.user.favoriteMovies = [
+        movie,
+        ...existingFavorites.filter(
+          (item) => Number(item.tmdbId ?? item.id) !== movieId,
+        ),
+      ];
+      return res.status(201).json({ favorites: publicFavorites(req.user) });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  router.delete("/favorites/:movieId", requireUser, async (req, res, next) => {
+    try {
+      const movieId = Number(req.params.movieId);
+      if (!Number.isFinite(movieId)) {
+        return res.status(400).json({ message: "movieId is required" });
+      }
+
+      if (mongoReady) {
+        const updated = await User.findById(req.user._id);
+        updated.favoriteMovies = (updated.favoriteMovies || []).filter(
+          (item) => Number(item.tmdbId ?? item.id) !== movieId,
+        );
+        await updated.save();
+        return res.json({ favorites: publicFavorites(updated) });
+      }
+
+      req.user.favoriteMovies = (req.user.favoriteMovies || []).filter(
+        (item) => Number(item.tmdbId ?? item.id) !== movieId,
+      );
+      return res.json({ favorites: publicFavorites(req.user) });
     } catch (error) {
       return next(error);
     }

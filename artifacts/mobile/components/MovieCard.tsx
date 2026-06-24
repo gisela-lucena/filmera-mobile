@@ -39,10 +39,25 @@ interface MovieCardProps {
   onSwipeRight: () => boolean | Promise<boolean>;
   isTop: boolean;
   stackIndex?: number;
+  isFavorite?: boolean;
+  favoriteLoading?: boolean;
+  onToggleFavorite?: (movie: Movie) => void | Promise<void>;
 }
 
 export const MovieCard = forwardRef<MovieCardRef, MovieCardProps>(
-  ({ movie, onSwipeLeft, onSwipeRight, isTop, stackIndex = 0 }, ref) => {
+  (
+    {
+      movie,
+      onSwipeLeft,
+      onSwipeRight,
+      isTop,
+      stackIndex = 0,
+      isFavorite = false,
+      favoriteLoading = false,
+      onToggleFavorite,
+    },
+    ref,
+  ) => {
     const colors = useColors();
     const position = useRef(new Animated.ValueXY()).current;
     const isAnimating = useRef(false);
@@ -71,7 +86,11 @@ export const MovieCard = forwardRef<MovieCardRef, MovieCardProps>(
         const movieId = movie.tmdbId ?? movie.id;
         const movieCredits = await fetchMovieCredits(movieId);
         setCredits(movieCredits);
-        if (!movieCredits.director && movieCredits.cast.length === 0) {
+        if (
+          !movieCredits.director &&
+          movieCredits.cast.length === 0 &&
+          !movieCredits.certification
+        ) {
           setCreditsError("Credits are not available for this movie.");
         }
       } catch (error: any) {
@@ -207,6 +226,26 @@ export const MovieCard = forwardRef<MovieCardRef, MovieCardProps>(
               <Feather name="info" size={20} color="#FDFBEF" />
             </Pressable>
 
+            <Pressable
+              onPress={() => onToggleFavorite?.(movie)}
+              disabled={favoriteLoading}
+              style={({ pressed }) => [
+                styles.favoriteButton,
+                isFavorite && styles.favoriteButtonActive,
+                { opacity: pressed || favoriteLoading ? 0.72 : 1 },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={
+                isFavorite ? "Remove movie from favorites" : "Save movie to favorites"
+              }
+            >
+              <Feather
+                name="star"
+                size={21}
+                color={isFavorite ? "#17092A" : "#FDFBEF"}
+              />
+            </Pressable>
+
             <Animated.View
               style={[styles.stamp, styles.likeStamp, { opacity: likeOpacity }]}
             >
@@ -247,6 +286,11 @@ export const MovieCard = forwardRef<MovieCardRef, MovieCardProps>(
                 <Text style={styles.creditsLabel}>Director</Text>
                 <Text style={styles.creditsText}>
                   {credits?.director || "Not available"}
+                </Text>
+
+                <Text style={styles.creditsLabel}>Rating</Text>
+                <Text style={styles.creditsText}>
+                  {credits?.certification || "Not rated"}
                 </Text>
 
                 <Text style={styles.creditsLabel}>Cast</Text>
@@ -325,6 +369,20 @@ const styles = StyleSheet.create({
   infoButton: {
     position: "absolute",
     top: 18,
+    left: 18,
+    zIndex: 4,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
+  favoriteButton: {
+    position: "absolute",
+    top: 18,
     right: 18,
     zIndex: 4,
     width: 42,
@@ -335,6 +393,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.18)",
     backgroundColor: "rgba(0,0,0,0.45)",
+  },
+  favoriteButtonActive: {
+    borderColor: "rgba(255,214,0,0.75)",
+    backgroundColor: "#FFD600",
   },
   creditsPanel: {
     position: "absolute",

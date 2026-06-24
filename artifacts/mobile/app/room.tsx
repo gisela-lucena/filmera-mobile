@@ -25,6 +25,7 @@ import {
   api,
   fetchMoviesWithFilters,
   FilterOptions,
+  MAX_FAVORITE_MOVIES,
   Room,
 } from "@/services/api";
 import { connectRoomRealtime } from "@/services/roomRealtime";
@@ -105,6 +106,8 @@ export default function RoomScreen() {
   const [selectedSort, setSelectedSort] = useState("popularity.desc");
   const [startingGame, setStartingGame] = useState(false);
   const [copiedInvite, setCopiedInvite] = useState(false);
+  const [favoriteMovieIds, setFavoriteMovieIds] = useState<Set<number>>(new Set());
+  const [favoriteBusyId, setFavoriteBusyId] = useState<number | null>(null);
 
   const cardRef = useRef<MovieCardRef>(null);
   const swiping = useRef(false);
@@ -155,6 +158,28 @@ export default function RoomScreen() {
     if (didInit.current) return;
     didInit.current = true;
     initRoom();
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    api
+      .getFavorites()
+      .then((favorites) => {
+        if (!isMounted) return;
+        setFavoriteMovieIds(
+          new Set(
+            favorites
+              .map((movie) => movie.tmdbId ?? movie.id)
+              .filter((id): id is number => Number.isFinite(id)),
+          ),
+        );
+      })
+      .catch(() => undefined);
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // ── Realtime participants & match updates ────────────────────────────────
@@ -307,6 +332,7 @@ export default function RoomScreen() {
 
   const currentMovie = movies[currentIndex];
   const nextMovie = movies[currentIndex + 1];
+  const currentMovieFavoriteId = currentMovie?.tmdbId ?? currentMovie?.id;
   const roomCode = room?.code ?? codeParam ?? "";
   const inviteLink = roomCode
     ? Linking.createURL("room", {
@@ -347,6 +373,52 @@ export default function RoomScreen() {
         : [...prev, id],
     );
   };
+
+  const toggleFavorite = useCallback(async (movie: Movie) => {
+    const movieId = movie.tmdbId ?? movie.id;
+    if (!Number.isFinite(movieId) || favoriteBusyId === movieId) return;
+
+    const wasFavorite = favoriteMovieIds.has(movieId);
+
+    if (!wasFavorite && favoriteMovieIds.size >= MAX_FAVORITE_MOVIES) {
+      setError(`You can save up to ${MAX_FAVORITE_MOVIES} favorite movies.`);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      return;
+    }
+
+    setFavoriteBusyId(movieId);
+    setFavoriteMovieIds((currentIds) => {
+      const nextIds = new Set(currentIds);
+      if (wasFavorite) nextIds.delete(movieId);
+      else nextIds.add(movieId);
+      return nextIds;
+    });
+
+    try {
+      const favorites = wasFavorite
+        ? await api.removeFavorite(movieId)
+        : await api.addFavorite(movie);
+      setFavoriteMovieIds(
+        new Set(
+          favorites
+            .map((favorite) => favorite.tmdbId ?? favorite.id)
+            .filter((id): id is number => Number.isFinite(id)),
+        ),
+      );
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (error: any) {
+      setFavoriteMovieIds((currentIds) => {
+        const nextIds = new Set(currentIds);
+        if (wasFavorite) nextIds.add(movieId);
+        else nextIds.delete(movieId);
+        return nextIds;
+      });
+      setError(error.message || "Could not update favorites.");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
+      setFavoriteBusyId(null);
+    }
+  }, [favoriteBusyId, favoriteMovieIds]);
 
   return (
     <View style={styles.container}>
@@ -663,6 +735,12 @@ export default function RoomScreen() {
                 onSwipeRight={handleSwipeRight}
                 isTop={true}
                 stackIndex={0}
+                isFavorite={
+                  Number.isFinite(currentMovieFavoriteId) &&
+                  favoriteMovieIds.has(currentMovieFavoriteId)
+                }
+                favoriteLoading={favoriteBusyId === currentMovieFavoriteId}
+                onToggleFavorite={toggleFavorite}
               />
             )}
           </View>
