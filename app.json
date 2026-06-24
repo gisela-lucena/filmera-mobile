@@ -4,6 +4,9 @@
       "eas": {
         "projectId": "41e01a35-ad17-4d29-867b-c83103f165e6"
       }
+    },
+    "android": {
+      "package": "us.filmera.mobile"
     }
   }
 }
