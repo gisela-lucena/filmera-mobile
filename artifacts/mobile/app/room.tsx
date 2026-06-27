@@ -84,7 +84,7 @@ export default function RoomScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const { action, code: codeParam } = useLocalSearchParams<{ action: string; code: string }>();
 
   const topPad = Platform.OS === "web" ? Math.max(insets.top, 67) : insets.top;
@@ -153,14 +153,37 @@ export default function RoomScreen() {
     [codeParam, room?.code, router, user]
   );
 
+  const handleBack = useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+
+    router.replace("/");
+  }, [router]);
+
   // ── Initialize on mount ─────────────────────────────────────────────────
   useEffect(() => {
     if (didInit.current) return;
+    if (authLoading) {
+      setStage("loading");
+      setLoadingLabel("Preparing your account…");
+      return;
+    }
+    if (!user) {
+      setStage("loading");
+      setLoadingLabel("Sign in required");
+      setError("Please sign in before joining a room.");
+      return;
+    }
+
     didInit.current = true;
     initRoom();
-  }, []);
+  }, [authLoading, user, action, codeParam]);
 
   useEffect(() => {
+    if (authLoading || !user) return;
+
     let isMounted = true;
 
     api
@@ -180,7 +203,7 @@ export default function RoomScreen() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [authLoading, user]);
 
   // ── Realtime participants & match updates ────────────────────────────────
   useEffect(() => {
@@ -349,6 +372,17 @@ export default function RoomScreen() {
     setTimeout(() => setCopiedInvite(false), 1800);
   };
 
+  const retryInitRoom = () => {
+    if (authLoading) return;
+    if (!user) {
+      setStage("loading");
+      setLoadingLabel("Sign in required");
+      setError("Please sign in before joining a room.");
+      return;
+    }
+    initRoom();
+  };
+
   useEffect(() => {
     movies
       .slice(currentIndex, currentIndex + 4)
@@ -428,7 +462,7 @@ export default function RoomScreen() {
       <View style={[styles.header, { paddingTop: topPad + 10 }]}>
         <Pressable
           style={({ pressed }) => [styles.backBtn, { opacity: pressed ? 0.6 : 1 }]}
-          onPress={() => router.back()}
+          onPress={handleBack}
         >
           <Feather name="chevron-left" size={24} color={colors.foreground} />
         </Pressable>
@@ -465,7 +499,7 @@ export default function RoomScreen() {
             <>
               <Text style={[styles.stateSub, { color: "#FF6B6B" }]}>{error}</Text>
               <Pressable
-                onPress={initRoom}
+                onPress={retryInitRoom}
                 style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
               >
                 <LinearGradient colors={["#FFD600", "#FFE566"]} style={styles.ctaBtn}>
