@@ -115,6 +115,10 @@ pnpm run typecheck
 pnpm run build
 ```
 
+## Load testing
+
+The repository includes guarded k6 scenarios for HTTP health, the authenticated REST room flow, concurrent WebSocket connections, and room broadcast latency. See [`load-tests/README.md`](load-tests/README.md) for setup, gradual execution, instrumentation, thresholds, and safe staging usage.
+
 From `artifacts/mobile`:
 
 ```bash

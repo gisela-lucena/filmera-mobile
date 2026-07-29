@@ -4,6 +4,7 @@ import cors from "cors";
 import express from "express";
 import http from "node:http";
 import crypto from "node:crypto";
+import { monitorEventLoopDelay } from "node:perf_hooks";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import { WebSocket, WebSocketServer } from "ws";
@@ -14,6 +15,8 @@ const MONGODB_URI = process.env.MONGODB_URI || "";
 const API_PREFIX = "/api/filmera";
 const MAX_FAVORITE_MOVIES = 200;
 const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000;
+const LOAD_TEST_METRICS = process.env.LOAD_TEST_METRICS === "true";
+const LOAD_TEST_METRICS_TOKEN = process.env.LOAD_TEST_METRICS_TOKEN || "";
 const PASSWORD_RESET_URL =
   process.env.PASSWORD_RESET_URL || "filmera://reset-password";
 const EXPO_GO_RESET_URL = process.env.EXPO_GO_RESET_URL || "";
@@ -143,6 +146,15 @@ const Room = mongoose.model("Room", roomSchema);
 const Swipe = mongoose.model("Swipe", swipeSchema);
 
 let mongoReady = false;
+const processStartedAt = Date.now();
+const eventLoopDelay = monitorEventLoopDelay({ resolution: 20 });
+const realtimeMetrics = {
+  connectionsOpened: 0,
+  connectionsClosed: 0,
+  messagesSent: 0,
+};
+
+if (LOAD_TEST_METRICS) eventLoopDelay.enable();
 
 function publicUser(user) {
   return {
@@ -314,6 +326,7 @@ const socketsByRoom = new Map();
 function sendJson(socket, data) {
   if (socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify(data));
+    realtimeMetrics.messagesSent += 1;
   }
 }
 
@@ -426,6 +439,44 @@ function createRouter() {
   router.get("/health", (_req, res) => {
     res.json({ ok: true, database: mongoReady ? "mongodb" : "memory" });
   });
+
+  if (LOAD_TEST_METRICS) {
+    router.get("/load-test/metrics", (req, res) => {
+      if (
+        LOAD_TEST_METRICS_TOKEN &&
+        req.headers.authorization !== `Bearer ${LOAD_TEST_METRICS_TOKEN}`
+      ) {
+        return res.status(401).json({ message: "Invalid metrics token" });
+      }
+
+      const memoryUsage = process.memoryUsage();
+      const cpuUsage = process.cpuUsage();
+      return res.json({
+        uptimeSeconds: Math.round((Date.now() - processStartedAt) / 1000),
+        process: {
+          residentMemoryBytes: memoryUsage.rss,
+          heapUsedBytes: memoryUsage.heapUsed,
+          heapTotalBytes: memoryUsage.heapTotal,
+          cpuUserMicroseconds: cpuUsage.user,
+          cpuSystemMicroseconds: cpuUsage.system,
+          eventLoopDelayMs: {
+            mean: Number(eventLoopDelay.mean / 1e6) || 0,
+            p95: Number(eventLoopDelay.percentile(95) / 1e6) || 0,
+            p99: Number(eventLoopDelay.percentile(99) / 1e6) || 0,
+            max: Number(eventLoopDelay.max / 1e6) || 0,
+          },
+        },
+        websocket: {
+          activeConnections: Array.from(socketsByRoom.values()).reduce(
+            (total, sockets) => total + sockets.size,
+            0,
+          ),
+          activeRooms: socketsByRoom.size,
+          ...realtimeMetrics,
+        },
+      });
+    });
+  }
 
   router.get("/open-reset-password", (req, res) => {
     const token = String(req.query?.token || "");
@@ -981,11 +1032,13 @@ async function start() {
     const sockets = socketsByRoom.get(room.code) || new Set();
     sockets.add(socket);
     socketsByRoom.set(room.code, sockets);
+    realtimeMetrics.connectionsOpened += 1;
 
     sendJson(socket, { type: "room:update", room: publicRoom(room) });
     broadcastRoom(room);
 
     socket.on("close", () => {
+      realtimeMetrics.connectionsClosed += 1;
       sockets.delete(socket);
       if (sockets.size === 0) socketsByRoom.delete(room.code);
     });

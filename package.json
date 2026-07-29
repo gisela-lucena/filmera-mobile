@@ -1,6 +1,11 @@
 {
   "name": "workspace",
   "version": "0.0.0",
+  "packageManager": "pnpm@11.13.0",
+  "engines": {
+    "node": ">=24 <25",
+    "pnpm": ">=11 <12"
+  },
   "license": "MIT",
   "scripts": {
     "preinstall": "rm -f package-lock.json yarn.lock",
@@ -8,7 +13,11 @@
     "dev:ios": "pnpm --filter @workspace/mobile run dev:ios",
     "dev:backend": "pnpm --filter @workspace/backend run dev",
     "start:backend": "pnpm --filter @workspace/backend run start",
-    "typecheck": "pnpm --filter @workspace/mobile run typecheck"
+    "typecheck": "pnpm --filter @workspace/mobile run typecheck",
+    "load:health": "k6 run load-tests/health.js",
+    "load:rest": "k6 run load-tests/rest-flow.js",
+    "load:websocket": "k6 run load-tests/websocket.js",
+    "load:broadcast": "k6 run load-tests/broadcast.js"
   },
   "private": true,
   "devDependencies": {
