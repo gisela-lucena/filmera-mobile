@@ -979,15 +979,7 @@ function createRouter() {
   return router;
 }
 
-async function start() {
-  if (MONGODB_URI) {
-    await mongoose.connect(MONGODB_URI);
-    mongoReady = true;
-    console.log("Connected to MongoDB");
-  } else {
-    console.warn("MONGODB_URI is not set. Using in-memory storage.");
-  }
-
+export function createApp() {
   const app = express();
   app.use(
     cors({
@@ -1015,6 +1007,35 @@ async function start() {
     res.status(500).json({ message: "Internal server error" });
   });
 
+  return app;
+}
+
+export function resetTestState() {
+  if (process.env.NODE_ENV !== "test") {
+    throw new Error("resetTestState can only run when NODE_ENV=test");
+  }
+  memory.users.length = 0;
+  memory.rooms.length = 0;
+  memory.swipes.length = 0;
+  for (const sockets of socketsByRoom.values()) {
+    for (const socket of sockets) socket.close();
+  }
+  socketsByRoom.clear();
+  realtimeMetrics.connectionsOpened = 0;
+  realtimeMetrics.connectionsClosed = 0;
+  realtimeMetrics.messagesSent = 0;
+}
+
+export async function start() {
+  if (MONGODB_URI) {
+    await mongoose.connect(MONGODB_URI);
+    mongoReady = true;
+    console.log("Connected to MongoDB");
+  } else {
+    console.warn("MONGODB_URI is not set. Using in-memory storage.");
+  }
+
+  const app = createApp();
   const server = http.createServer(app);
   const wss = new WebSocketServer({ noServer: true });
 
@@ -1068,12 +1089,18 @@ async function start() {
     });
   });
 
-  server.listen(PORT, "0.0.0.0", () => {
-    console.log(`Filmera backend listening on port ${PORT}`);
+  return new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(PORT, "0.0.0.0", () => {
+      console.log(`Filmera backend listening on port ${PORT}`);
+      resolve(server);
+    });
   });
 }
 
-start().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+if (process.env.NODE_ENV !== "test") {
+  start().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}

@@ -119,6 +119,19 @@ pnpm run build
 
 The repository includes guarded k6 scenarios for HTTP health, the authenticated REST room flow, concurrent WebSocket connections, and room broadcast latency. See [`load-tests/README.md`](load-tests/README.md) for setup, gradual execution, instrumentation, thresholds, and safe staging usage.
 
+## Automated tests and CI
+
+The backend uses Jest and Supertest for API integration tests covering authentication, rooms, swipes, validation, and the unanimous-match rule. The mobile app uses Jest with the `jest-expo` preset and React Native Testing Library for component behavior. Coverage thresholds prevent regressions.
+
+```bash
+pnpm test
+pnpm run test:coverage
+pnpm run typecheck
+pnpm --filter @workspace/mobile run build:ci
+```
+
+GitHub Actions runs dependency installation, typechecking, both coverage suites, coverage artifact upload, and iOS/Android Expo bundle exports on every push and pull request.
+
 From `artifacts/mobile`:
 
 ```bash

@@ -14,6 +14,8 @@
     "dev:backend": "pnpm --filter @workspace/backend run dev",
     "start:backend": "pnpm --filter @workspace/backend run start",
     "typecheck": "pnpm --filter @workspace/mobile run typecheck",
+    "test": "pnpm --filter @workspace/backend test && pnpm --filter @workspace/mobile test",
+    "test:coverage": "pnpm --filter @workspace/backend test:coverage && pnpm --filter @workspace/mobile test:coverage",
     "load:health": "k6 run load-tests/health.js",
     "load:rest": "k6 run load-tests/rest-flow.js",
     "load:websocket": "k6 run load-tests/websocket.js",
